@@ -1,0 +1,94 @@
+# Supabase local config for Site Analytics.
+# Targets a recent Supabase CLI. If `supabase start` complains about an unknown
+# key, run `supabase init` in a scratch directory to see the current defaults
+# and reconcile - do not run it here (it would overwrite this file).
+
+project_id = "site-analytics"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+# Local email testing inbox (for password reset, etc.)
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+# Local dev base URL. Production Site URL is set in the hosted dashboard to
+# Production Site URL is configured in the hosted Supabase dashboard and is
+# never committed here.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/**"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# No public signup - only pre-provisioned admins may exist.
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+double_confirm_changes = true
+secure_password_change = true
+
+# TOTP multi-factor auth - required for all dashboard reads (aal2).
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+inspector_port = 8083
+
+# All functions verify auth in code (user JWT + aal2 + admin allowlist for
+# manual-sync; automation secret for scheduled). verify_jwt is off so we keep
+# control of CORS/OPTIONS and our own 401/403 responses.
+[functions.manual-sync]
+verify_jwt = false
+
+[functions.manage-sites]
+verify_jwt = false
+
+[functions.scheduled-sync-gsc]
+verify_jwt = false
+
+[functions.scheduled-sync-ga4]
+verify_jwt = false
+
+[functions.scheduled-sync-bing]
+verify_jwt = false
+
+[analytics]
+enabled = false
