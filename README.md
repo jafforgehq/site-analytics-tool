@@ -30,7 +30,7 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - Lightweight query rank tracking: star Search Console queries and chart their average position over time - no scraping, no extra API calls.
 - Chart annotations for deploys, content pushes, and SEO changes, so traffic shifts have explanations.
 - Hourly uptime checks of each site's public URL with a 7-day availability view.
-- Optional on-demand AI briefing (bring your own Anthropic API key; off until configured).
+- AI briefing (coming soon): the backend is built and safe to deploy today, but not yet wired into the UI.
 
 ## Product tour
 
@@ -283,20 +283,9 @@ From the **Sites** page, add each website and enter only the identifiers you use
 
 Configured integrations enable automatically. Use a manual sync for the first import, then inspect **Sync history** and **Integration health** before trusting scheduled data.
 
-### 9. Optional: enable AI briefings
+### About the `ai-briefing` Edge Function
 
-The overview page has a "Generate briefing" button that turns the portfolio's aggregate numbers into a short analyst-style narrative using the Claude API. It is **off by default** and stays off until you add one Edge Function secret:
-
-```
-ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY
-```
-
-Notes:
-
-- Briefings run **only when you click the button** - never on a schedule.
-- Only aggregate data leaves your project (KPIs, site names, movers, goal status), size-capped server-side; the key itself never reaches the browser.
-- Each briefing is a single, output-capped API call you pay Anthropic for directly. `AI_BRIEFING_MODEL` overrides the default model (`claude-opus-5`) if you prefer a cheaper one.
-- Without the secret, the button simply explains how to enable the feature.
+The deploy list in step 5 includes an `ai-briefing` function: an analyst-style portfolio narrative generated via the Claude API. Its backend is complete and safe to deploy - it does nothing unless you add an `ANTHROPIC_API_KEY` Edge Function secret, size-caps its input, and never runs on a schedule - but the dashboard doesn't call it yet, so setting the secret has no visible effect today. Track its UI launch in [CHANGELOG.md](CHANGELOG.md).
 
 ## Two-factor authentication
 
@@ -345,6 +334,10 @@ Then sign out, sign back in, and the app shows a fresh QR. Because TOTP secrets 
 - Uses daily aggregate data; tracked-query positions come from Search Console's daily top queries, so it is not a full keyword-rank tracker or website crawler.
 - Google and Bing provider quotas, permissions, and API changes are controlled by those providers.
 - Authenticator (2FA) devices are managed from the SQL editor, not the app UI - see [Two-factor authentication](#two-factor-authentication).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed and when.
 
 ## Contributing
 

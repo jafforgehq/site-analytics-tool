@@ -17,6 +17,7 @@ Thanks for improving Site Analytics.
    ```
 
 4. Describe any required Supabase migration, Edge Function redeploy, or manual provider setup in the pull request.
+5. Add an entry to [CHANGELOG.md](CHANGELOG.md) under `[Unreleased]` for any user-visible change - new feature, behavior change, or fix. Bump the version in `package.json` (and move your entry under a new dated heading) if the change is significant enough to warrant one; otherwise leave it under `[Unreleased]` for the maintainer to fold into the next version.
 
 ## Scope
 
