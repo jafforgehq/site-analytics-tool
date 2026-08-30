@@ -19,6 +19,7 @@ import { ComparisonTable } from "@/features/dashboard/ComparisonTable";
 import { CoveragePanel } from "@/features/dashboard/CoveragePanel";
 import { RefreshQueue } from "@/features/dashboard/RefreshQueue";
 import { BriefingCard } from "@/features/dashboard/BriefingCard";
+import { PortfolioTrajectorySection } from "@/features/dashboard/PortfolioTrajectorySection";
 import { cn } from "@/lib/utils";
 import { usePrivacyMode } from "@/lib/privacy";
 
@@ -28,6 +29,11 @@ export function OverviewPage() {
   const privacy = usePrivacyMode();
   const [days, setDays] = useState<number>(30);
   const insights = useInsights(days);
+  const activeSiteIds = new Set(
+    insights.data?.sitesWithStatuses
+      .filter((s) => s.is_active)
+      .map((s) => s.id) ?? [],
+  );
 
   return (
     <div className="space-y-6">
@@ -86,6 +92,15 @@ export function OverviewPage() {
           )}
 
           <PortfolioKpis data={insights.data} />
+
+          <PortfolioTrajectorySection
+            analytics={insights.data.raw.analytics.filter((r) =>
+              activeSiteIds.has(r.site_id),
+            )}
+            search={insights.data.raw.search.filter((r) =>
+              activeSiteIds.has(r.site_id),
+            )}
+          />
 
           <BriefingCard />
 
