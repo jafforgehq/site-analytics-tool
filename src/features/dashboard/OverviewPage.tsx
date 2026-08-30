@@ -87,7 +87,7 @@ export function OverviewPage() {
 
           <PortfolioKpis data={insights.data} />
 
-          <BriefingCard days={days} insights={insights.data} />
+          <BriefingCard />
 
           <div className="grid gap-3 lg:grid-cols-2">
             <InsightsFeed insights={insights.data.insights} />
