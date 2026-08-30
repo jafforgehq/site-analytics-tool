@@ -3,6 +3,10 @@ import { supabase } from "@/lib/supabase";
 import { fetchAllPages } from "@/lib/paginate";
 import { computeInsights, type InsightsResult } from "@/lib/insights";
 import { aggregateBreakdown, type TermRow } from "@/lib/search-terms";
+import {
+  buildExportComputed,
+  type PortfolioExportComputed,
+} from "@/lib/portfolio-export";
 import type {
   AnalyticsDaily,
   Annotation,
@@ -443,13 +447,14 @@ export async function getInsights(days: number): Promise<InsightsWithSites> {
 // Full data export ------------------------------------------------------------
 export interface PortfolioDataExport {
   generated_at: string;
-  schema_version: 1;
+  schema_version: 2;
   retention: {
     analytics_daily: "540 days";
     search_daily: "540 days";
     search_query_daily: "210 days";
     search_page_daily: "210 days";
     sync_runs: "120 days";
+    uptime_checks: "90 days";
   };
   row_counts: Record<keyof PortfolioDataExport["tables"], number>;
   tables: {
@@ -460,10 +465,24 @@ export interface PortfolioDataExport {
     search_query_daily: SearchQueryDaily[];
     search_page_daily: SearchPageDaily[];
     sync_runs: SyncRun[];
+    site_goals: SiteGoal[];
+    annotations: Annotation[];
+    tracked_queries: TrackedQuery[];
+    uptime_checks: UptimeCheck[];
   };
+  /**
+   * Derived intelligence an AI agent would otherwise have to recompute from
+   * the raw tables above: portfolio KPIs/movers/anomalies at three windows,
+   * per-site and portfolio-wide traffic forecasts, the content-decay refresh
+   * queue, and goal pace projections. Forecast summaries omit their observed
+   * series deliberately - that data is already in `tables`, so repeating it
+   * here would only bloat the file.
+   */
+  computed: PortfolioExportComputed;
 }
 
-/** Export every readable portfolio table as an agent-friendly JSON bundle. */
+/** Export every readable portfolio table, plus derived insights/forecasts, as
+ * an agent-friendly JSON bundle. */
 export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
   const [
     sitesRes,
@@ -473,6 +492,10 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
     searchQueryDaily,
     searchPageDaily,
     syncRuns,
+    siteGoalsRes,
+    annotationsRes,
+    trackedQueriesRes,
+    uptimeChecks,
   ] = await Promise.all([
     supabase.from("sites").select("*").order("name"),
     supabase.from("integration_status").select("*").order("site_id"),
@@ -513,35 +536,69 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
         .select("*")
         .order("started_at", { ascending: false }),
     ),
+    supabase.from("site_goals").select("*").order("target_date"),
+    supabase
+      .from("annotations")
+      .select("*")
+      .order("event_date", { ascending: false }),
+    supabase.from("tracked_queries").select("*").order("site_id"),
+    fetchAllPages<UptimeCheck>(() =>
+      supabase
+        .from("uptime_checks")
+        .select("*")
+        .order("checked_at", { ascending: false }),
+    ),
   ]);
 
   if (sitesRes.error) throw sitesRes.error;
   if (statusRes.error) throw statusRes.error;
+  if (siteGoalsRes.error) throw siteGoalsRes.error;
+  if (annotationsRes.error) throw annotationsRes.error;
+  if (trackedQueriesRes.error) throw trackedQueriesRes.error;
+
+  const sites = sitesRes.data ?? [];
+  const statuses = statusRes.data ?? [];
+  const siteGoals = siteGoalsRes.data ?? [];
 
   const tables = {
-    sites: sitesRes.data ?? [],
-    integration_status: statusRes.data ?? [],
+    sites,
+    integration_status: statuses,
     analytics_daily: analyticsDaily,
     search_daily: searchDaily,
     search_query_daily: searchQueryDaily,
     search_page_daily: searchPageDaily,
     sync_runs: syncRuns,
+    site_goals: siteGoals,
+    annotations: annotationsRes.data ?? [],
+    tracked_queries: trackedQueriesRes.data ?? [],
+    uptime_checks: uptimeChecks,
   };
+
+  const computed = buildExportComputed({
+    sites,
+    statuses,
+    analytics: analyticsDaily,
+    search: searchDaily,
+    searchPage: searchPageDaily,
+    goals: siteGoals,
+  });
 
   return {
     generated_at: new Date().toISOString(),
-    schema_version: 1,
+    schema_version: 2,
     retention: {
       analytics_daily: "540 days",
       search_daily: "540 days",
       search_query_daily: "210 days",
       search_page_daily: "210 days",
       sync_runs: "120 days",
+      uptime_checks: "90 days",
     },
     row_counts: Object.fromEntries(
       Object.entries(tables).map(([table, rows]) => [table, rows.length]),
     ) as PortfolioDataExport["row_counts"],
     tables,
+    computed,
   };
 }
 

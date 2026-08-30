@@ -22,6 +22,7 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - Email/password sign-in with mandatory TOTP MFA before dashboard data can be read.
 - Supabase Row Level Security: browser reads require both an allowlisted admin and an MFA-verified (`aal2`) session.
 - CSV/ZIP and PDF exports, plus a privacy mode for screensharing.
+- One-click full-portfolio export (JSON) for feeding into an AI agent: every table plus derived insights, forecasts, and goal projections in one file.
 - Light, dark, and system theme with a per-device preference.
 - Traffic trajectory forecasting (Holt-Winters with weekly seasonality, computed locally) with confidence bands on charts.
 - Per-site goals ("10,000 Google clicks a month by December") scored against the forecast: on track, at risk, off track.

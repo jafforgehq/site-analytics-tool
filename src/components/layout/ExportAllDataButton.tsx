@@ -101,6 +101,8 @@ function isSensitiveTextKey(key: string): boolean {
     "email",
     "message",
     "requested_by",
+    "label",
+    "note",
   ].some((part) => key.toLowerCase().includes(part));
 }
 
@@ -209,7 +211,7 @@ export function ExportAllDataButton() {
           <FormatButton
             icon={FileJson}
             label="JSON"
-            description="Single structured bundle"
+            description="Every table plus forecasts & insights - good for AI agents"
             loading={exporting && format === "json"}
             onClick={() => void handleExport("json")}
           />
