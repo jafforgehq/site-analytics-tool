@@ -27,6 +27,7 @@ import {
   DemoExportAllDataButton,
   DemoPdfExportButton,
 } from "@/features/demo/DemoExportButtons";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const NAV = [
   { to: "/demo", label: "Overview", icon: BarChart3, end: true },
@@ -126,6 +127,7 @@ export function DemoLayout() {
               {label}
             </NavLink>
           ))}
+          <ThemeToggle />
         </nav>
         <div className="mt-auto space-y-2 border-t border-border p-3">
           <p className="px-1 text-xs text-muted-foreground">

@@ -9,6 +9,22 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Apply the stored theme before first paint to avoid a light-mode flash.
+      // Kept in sync with src/lib/theme.ts (storage key "site-analytics-theme").
+      (function () {
+        try {
+          var stored = localStorage.getItem("site-analytics-theme");
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {
+          /* no-op: default to light */
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

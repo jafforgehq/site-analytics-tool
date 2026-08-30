@@ -22,6 +22,7 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - Email/password sign-in with mandatory TOTP MFA before dashboard data can be read.
 - Supabase Row Level Security: browser reads require both an allowlisted admin and an MFA-verified (`aal2`) session.
 - CSV/ZIP and PDF exports, plus a privacy mode for screensharing.
+- Light, dark, and system theme with a per-device preference.
 
 ## Product tour
 

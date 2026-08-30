@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ExportAllDataButton } from "@/components/layout/ExportAllDataButton";
 import { PrivacyModeToggle } from "@/components/layout/PrivacyModeToggle";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { APP_COMMIT } from "@/lib/build-info";
 import { usePrivacyMode } from "@/lib/privacy";
 
@@ -66,6 +67,7 @@ export function AppLayout() {
           ))}
           <ExportAllDataButton />
           <PrivacyModeToggle />
+          <ThemeToggle />
         </nav>
         <div className="mt-auto hidden border-t border-border p-3 md:block">
           <p className="truncate px-1 pb-2 text-xs text-muted-foreground">
