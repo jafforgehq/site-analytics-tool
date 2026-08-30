@@ -14,23 +14,16 @@ import {
   combineSearchAcrossSites,
   computePortfolioDecay,
   computeTrajectories,
-  clicksSeries,
-  sessionsSeries,
   type PortfolioDecayRow,
   type TrajectoryMetricResult,
 } from "@/lib/series";
-import {
-  projectGoal,
-  type ForecastMethod,
-  type GoalProjection,
-} from "@/lib/forecast";
+import type { ForecastMethod } from "@/lib/forecast";
 import type {
   AnalyticsDaily,
   IntegrationStatus,
   SearchDaily,
   SearchPageDaily,
   Site,
-  SiteGoal,
 } from "@/types/database";
 
 const TRAJECTORY_HORIZON_DAYS = 28;
@@ -48,17 +41,6 @@ export interface TrimmedTrajectory {
   } | null;
 }
 
-export interface GoalProjectionExport {
-  goal_id: string;
-  site_id: string;
-  site_name: string;
-  metric: SiteGoal["metric"];
-  target_value: number;
-  target_date: string;
-  note: string | null;
-  projection: GoalProjection;
-}
-
 export interface SiteTrajectoryExport {
   site_id: string;
   site_name: string;
@@ -70,7 +52,6 @@ export interface PortfolioExportComputed {
   portfolio_trajectory: TrimmedTrajectory[];
   site_trajectories: SiteTrajectoryExport[];
   refresh_queue: PortfolioDecayRow[];
-  goal_projections: GoalProjectionExport[];
 }
 
 function trimTrajectory(t: TrajectoryMetricResult): TrimmedTrajectory {
@@ -95,7 +76,6 @@ export interface BuildExportComputedInput {
   analytics: AnalyticsDaily[];
   search: SearchDaily[];
   searchPage: SearchPageDaily[];
-  goals: SiteGoal[];
   now?: Date;
 }
 
@@ -155,34 +135,10 @@ export function buildExportComputed(
     today,
   );
 
-  const siteNameById = new Map(input.sites.map((s) => [s.id, s.name]));
-  const goalProjections: GoalProjectionExport[] = input.goals.map((goal) => {
-    const series =
-      goal.metric === "sessions"
-        ? sessionsSeries(analyticsBySite.get(goal.site_id) ?? [])
-        : clicksSeries(searchBySite.get(goal.site_id) ?? []);
-    return {
-      goal_id: goal.id,
-      site_id: goal.site_id,
-      site_name: siteNameById.get(goal.site_id) ?? "Unknown site",
-      metric: goal.metric,
-      target_value: goal.target_value,
-      target_date: goal.target_date,
-      note: goal.note,
-      projection: projectGoal(
-        series,
-        goal.target_value,
-        goal.target_date,
-        today,
-      ),
-    };
-  });
-
   return {
     insights,
     portfolio_trajectory: portfolioTrajectory,
     site_trajectories: siteTrajectories,
     refresh_queue: refreshQueue,
-    goal_projections: goalProjections,
   };
 }

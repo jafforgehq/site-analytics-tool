@@ -6,7 +6,7 @@ Thanks for improving Site Analytics.
 
 1. Keep provider credentials, tokens, domains, and real analytics data out of commits.
 2. Add or update tests when changing calculation, validation, or Edge Function behaviour.
-3. Run the full local check:
+3. Run the full local check (CI runs the same steps on every push and pull request, so catching failures locally first saves a round trip):
 
    ```bash
    npm run format:check

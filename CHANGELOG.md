@@ -6,6 +6,21 @@ This project doesn't yet cut formal GitHub Releases or git tags - version number
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-30
+
+### Added
+
+- CI: a GitHub Actions workflow runs format/lint/typecheck/test/build on every push and pull request to `main` - the same checklist CONTRIBUTING.md already asked contributors to run locally, now enforced automatically.
+
+### Removed
+
+- **Goals** and **chart annotations** - both features are gone: the database tables (`site_goals`, `annotations`), their RLS policies, the `manage-portfolio` Edge Function actions that wrote to them, the UI sections on the site detail page, chart markers, the goals page of the PDF report, and their fields in the AI-agent JSON export. Trajectory forecasting, the refresh queue, tracked queries, and uptime monitoring are unaffected.
+- `projectGoal`/`GoalProjection` from the forecast engine and the now-fully-unused `src/lib/briefing.ts` (already orphaned since the AI briefing UI became a placeholder in 0.3.0).
+
+### Migration
+
+- New migration `0010_remove_goals_and_annotations.sql` drops both tables (and their policies/indexes, via cascade) on an already-deployed project. Run it after `0009` in the SQL Editor, same as any other migration.
+
 ## [0.5.0] - 2026-08-30
 
 ### Added

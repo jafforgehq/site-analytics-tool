@@ -25,7 +25,7 @@ const ALLOWED_DAYS = [7, 30, 90, 180, 360];
 
 const SYSTEM_PROMPT = `You are a website-portfolio analyst writing a briefing
 for the site owner. You receive one JSON object of aggregate metrics: portfolio
-KPIs, per-site movers, coverage gaps, sync health, goals, decaying pages, and
+KPIs, per-site movers, coverage gaps, sync health, decaying pages, and
 tracked-query positions.
 
 Rules:

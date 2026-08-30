@@ -6,16 +6,9 @@ import {
 } from "@tanstack/react-query";
 import {
   addTrackedQuery,
-  createAnnotation,
-  createGoal,
-  deleteAnnotation,
-  deleteGoal,
   getAiBriefing,
-  getAllGoals,
-  getAnnotations,
   getIntegrationStatuses,
   getPortfolioPageDaily,
-  getSiteGoals,
   getSitePageDaily,
   getTrackedQueryHistory,
   getUptimeSummaries,
@@ -49,9 +42,6 @@ export const queryKeys = {
     ["integration-statuses", siteId ?? null] as const,
   syncRuns: (filters: SyncRunFilters) => ["sync-runs", filters] as const,
   dbUsage: ["db-usage"] as const,
-  siteGoals: (siteId: string) => ["site-goals", siteId] as const,
-  allGoals: ["site-goals", "all"] as const,
-  annotations: (siteId?: string) => ["annotations", siteId ?? "all"] as const,
   trackedQueryHistory: (siteId: string, days: number) =>
     ["tracked-query-history", siteId, days] as const,
   uptime: ["uptime"] as const,
@@ -174,67 +164,6 @@ export function useManualSync(siteId: string) {
 }
 
 // V2 hooks --------------------------------------------------------------------
-
-export function useSiteGoals(siteId: string) {
-  return useQuery({
-    queryKey: queryKeys.siteGoals(siteId),
-    queryFn: () => getSiteGoals(siteId),
-    enabled: !!siteId,
-  });
-}
-
-export function useAllGoals() {
-  return useQuery({ queryKey: queryKeys.allGoals, queryFn: getAllGoals });
-}
-
-export function useCreateGoal(siteId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: createGoal,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.siteGoals(siteId) });
-      qc.invalidateQueries({ queryKey: ["site-goals"] });
-    },
-  });
-}
-
-export function useDeleteGoal(siteId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: deleteGoal,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.siteGoals(siteId) });
-      qc.invalidateQueries({ queryKey: ["site-goals"] });
-    },
-  });
-}
-
-export function useAnnotations(siteId?: string) {
-  return useQuery({
-    queryKey: queryKeys.annotations(siteId),
-    queryFn: () => getAnnotations(siteId),
-  });
-}
-
-export function useCreateAnnotation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: createAnnotation,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["annotations"] });
-    },
-  });
-}
-
-export function useDeleteAnnotation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: deleteAnnotation,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["annotations"] });
-    },
-  });
-}
 
 export function useTrackedQueryHistory(siteId: string, days: number) {
   return useQuery({

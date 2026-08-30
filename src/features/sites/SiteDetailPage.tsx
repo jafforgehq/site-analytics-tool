@@ -33,8 +33,6 @@ import { SiteFormDialog } from "@/features/sites/SiteFormDialog";
 import { SearchTermsSection } from "@/features/sites/SearchTermsSection";
 import { SiteReportExportButton } from "@/features/sites/SiteReportExportButton";
 import { TrajectorySection } from "@/features/sites/TrajectorySection";
-import { GoalsSection } from "@/features/sites/GoalsSection";
-import { AnnotationsSection } from "@/features/sites/AnnotationsSection";
 import { TrackedQueriesSection } from "@/features/sites/TrackedQueriesSection";
 import { UptimeCard } from "@/features/sites/UptimeCard";
 import { Button } from "@/components/ui/button";
@@ -201,11 +199,6 @@ export function SiteDetailPage() {
             analytics={metricsQuery.data?.analytics ?? []}
             search={metricsQuery.data?.search ?? []}
           />
-          <GoalsSection
-            siteId={siteId}
-            analytics={metricsQuery.data?.analytics ?? []}
-            search={metricsQuery.data?.search ?? []}
-          />
           <MetricsSection
             days={days}
             analytics={metricsQuery.data?.analytics ?? []}
@@ -213,8 +206,6 @@ export function SiteDetailPage() {
           />
         </>
       )}
-
-      <AnnotationsSection siteId={siteId} />
 
       <TrackedQueriesSection siteId={siteId} days={days} />
 

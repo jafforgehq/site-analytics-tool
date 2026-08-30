@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   forecastSeries,
-  projectGoal,
   toContiguousSeries,
   type SeriesPoint,
 } from "@/lib/forecast";
@@ -113,42 +112,5 @@ describe("forecastSeries", () => {
   it("is deterministic", () => {
     const rows = makeSeries(42, (i) => 300 + i + (i % 7) * 5);
     expect(forecastSeries(rows, 7)).toEqual(forecastSeries(rows, 7));
-  });
-});
-
-describe("projectGoal", () => {
-  it("reports achieved when the trailing-30d total already meets the target", () => {
-    const rows = makeSeries(40, () => 100); // trailing 30d = 3000
-    const goal = projectGoal(rows, 2500, "2026-03-01", "2026-02-09");
-    expect(goal.status).toBe("achieved");
-    expect(goal.currentValue).toBe(3000);
-  });
-
-  it("reports on_track when the trend reaches the target in time", () => {
-    // Rising 10/day; trailing-30d total grows quickly.
-    const rows = makeSeries(56, (i) => 100 + 10 * i);
-    const goal = projectGoal(rows, 25000, "2026-04-01", "2026-02-25");
-    expect(goal.status).toBe("on_track");
-    expect(goal.projectedValue).toBeGreaterThan(goal.currentValue);
-  });
-
-  it("reports off_track for a flat series far from the target", () => {
-    const rows = makeSeries(56, () => 10); // trailing 30d = 300, forever
-    const goal = projectGoal(rows, 10000, "2026-04-01", "2026-02-25");
-    expect(goal.status).toBe("off_track");
-  });
-
-  it("reports off_track when the target date has passed unmet", () => {
-    const rows = makeSeries(40, () => 10);
-    const goal = projectGoal(rows, 10000, "2026-02-09", "2026-02-09");
-    expect(goal.status).toBe("off_track");
-    expect(goal.daysRemaining).toBe(0);
-  });
-
-  it("degrades to at_risk with unknown projection on tiny history", () => {
-    const rows = makeSeries(3, () => 50);
-    const goal = projectGoal(rows, 5000, "2026-03-01", "2026-01-03");
-    expect(goal.status).toBe("at_risk");
-    expect(goal.projectedValue).toBeNull();
   });
 });

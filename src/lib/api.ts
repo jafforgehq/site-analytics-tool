@@ -9,15 +9,11 @@ import {
 } from "@/lib/portfolio-export";
 import type {
   AnalyticsDaily,
-  Annotation,
-  AnnotationKind,
-  GoalMetric,
   IntegrationStatus,
   SearchDaily,
   SearchPageDaily,
   SearchQueryDaily,
   Site,
-  SiteGoal,
   SyncRun,
   SyncSource,
   SyncStatus,
@@ -398,7 +394,7 @@ export async function deleteSite(id: string): Promise<void> {
 export interface InsightsWithSites extends InsightsResult {
   sitesWithStatuses: SiteWithStatuses[];
   /** The raw daily rows behind the computation - already fetched, kept so
-   * downstream features (goal projections, briefing) can reuse them. */
+   * downstream features can reuse them. */
   raw: { analytics: AnalyticsDaily[]; search: SearchDaily[] };
 }
 
@@ -465,18 +461,16 @@ export interface PortfolioDataExport {
     search_query_daily: SearchQueryDaily[];
     search_page_daily: SearchPageDaily[];
     sync_runs: SyncRun[];
-    site_goals: SiteGoal[];
-    annotations: Annotation[];
     tracked_queries: TrackedQuery[];
     uptime_checks: UptimeCheck[];
   };
   /**
    * Derived intelligence an AI agent would otherwise have to recompute from
    * the raw tables above: portfolio KPIs/movers/anomalies at three windows,
-   * per-site and portfolio-wide traffic forecasts, the content-decay refresh
-   * queue, and goal pace projections. Forecast summaries omit their observed
-   * series deliberately - that data is already in `tables`, so repeating it
-   * here would only bloat the file.
+   * per-site and portfolio-wide traffic forecasts, and the content-decay
+   * refresh queue. Forecast summaries omit their observed series
+   * deliberately - that data is already in `tables`, so repeating it here
+   * would only bloat the file.
    */
   computed: PortfolioExportComputed;
 }
@@ -492,8 +486,6 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
     searchQueryDaily,
     searchPageDaily,
     syncRuns,
-    siteGoalsRes,
-    annotationsRes,
     trackedQueriesRes,
     uptimeChecks,
   ] = await Promise.all([
@@ -536,11 +528,6 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
         .select("*")
         .order("started_at", { ascending: false }),
     ),
-    supabase.from("site_goals").select("*").order("target_date"),
-    supabase
-      .from("annotations")
-      .select("*")
-      .order("event_date", { ascending: false }),
     supabase.from("tracked_queries").select("*").order("site_id"),
     fetchAllPages<UptimeCheck>(() =>
       supabase
@@ -552,13 +539,10 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
 
   if (sitesRes.error) throw sitesRes.error;
   if (statusRes.error) throw statusRes.error;
-  if (siteGoalsRes.error) throw siteGoalsRes.error;
-  if (annotationsRes.error) throw annotationsRes.error;
   if (trackedQueriesRes.error) throw trackedQueriesRes.error;
 
   const sites = sitesRes.data ?? [];
   const statuses = statusRes.data ?? [];
-  const siteGoals = siteGoalsRes.data ?? [];
 
   const tables = {
     sites,
@@ -568,8 +552,6 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
     search_query_daily: searchQueryDaily,
     search_page_daily: searchPageDaily,
     sync_runs: syncRuns,
-    site_goals: siteGoals,
-    annotations: annotationsRes.data ?? [],
     tracked_queries: trackedQueriesRes.data ?? [],
     uptime_checks: uptimeChecks,
   };
@@ -580,7 +562,6 @@ export async function getPortfolioDataExport(): Promise<PortfolioDataExport> {
     analytics: analyticsDaily,
     search: searchDaily,
     searchPage: searchPageDaily,
-    goals: siteGoals,
   });
 
   return {
@@ -648,7 +629,7 @@ export async function runCleanup(dryRun: boolean): Promise<CleanupResult> {
 }
 
 // ---------------------------------------------------------------------------
-// V2: goals, annotations, tracked queries, uptime, decay, AI briefing
+// V2: tracked queries, uptime, decay, AI briefing
 // ---------------------------------------------------------------------------
 
 export class PortfolioActionError extends Error {
@@ -690,91 +671,6 @@ async function invokeFunction<T>(
     throw new PortfolioActionError(code, message, status);
   }
   return data as T;
-}
-
-// Goals -----------------------------------------------------------------------
-export async function getSiteGoals(siteId: string): Promise<SiteGoal[]> {
-  const { data, error } = await supabase
-    .from("site_goals")
-    .select("*")
-    .eq("site_id", siteId)
-    .order("target_date");
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function getAllGoals(): Promise<SiteGoal[]> {
-  const { data, error } = await supabase
-    .from("site_goals")
-    .select("*")
-    .order("target_date");
-  if (error) throw error;
-  return data ?? [];
-}
-
-export interface GoalFormValues {
-  siteId: string;
-  metric: GoalMetric;
-  targetValue: number;
-  targetDate: string;
-  note?: string;
-}
-
-export async function createGoal(values: GoalFormValues): Promise<SiteGoal> {
-  const result = await invokeFunction<{ ok: boolean; goal: SiteGoal }>(
-    "manage-portfolio",
-    { action: "goal.create", goal: values },
-    "Could not create the goal.",
-  );
-  return result.goal;
-}
-
-export async function deleteGoal(id: string): Promise<void> {
-  await invokeFunction(
-    "manage-portfolio",
-    { action: "goal.delete", id },
-    "Could not delete the goal.",
-  );
-}
-
-// Annotations -----------------------------------------------------------------
-/** Annotations relevant to a site: its own plus portfolio-wide ones. Pass no
- * siteId for every annotation. */
-export async function getAnnotations(siteId?: string): Promise<Annotation[]> {
-  let query = supabase
-    .from("annotations")
-    .select("*")
-    .order("event_date", { ascending: false });
-  if (siteId) query = query.or(`site_id.eq.${siteId},site_id.is.null`);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
-}
-
-export interface AnnotationFormValues {
-  siteId: string | null;
-  eventDate: string;
-  label: string;
-  kind: AnnotationKind;
-}
-
-export async function createAnnotation(
-  values: AnnotationFormValues,
-): Promise<Annotation> {
-  const result = await invokeFunction<{ ok: boolean; annotation: Annotation }>(
-    "manage-portfolio",
-    { action: "annotation.create", annotation: values },
-    "Could not create the annotation.",
-  );
-  return result.annotation;
-}
-
-export async function deleteAnnotation(id: string): Promise<void> {
-  await invokeFunction(
-    "manage-portfolio",
-    { action: "annotation.delete", id },
-    "Could not delete the annotation.",
-  );
 }
 
 // Tracked queries -------------------------------------------------------------

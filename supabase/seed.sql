@@ -183,24 +183,8 @@ set
 where i.site_id = '22222222-2222-2222-2222-222222222222' and i.source = 'ga4';
 
 -- ---------------------------------------------------------------------------
--- V2 seed: goals, annotations, tracked queries, uptime checks
+-- V2 seed: tracked queries, uptime checks
 -- ---------------------------------------------------------------------------
-insert into public.site_goals (site_id, metric, target_value, target_date, note)
-values
-  ('11111111-1111-1111-1111-111111111111', 'clicks', 12000,
-   (current_date + interval '75 days')::date, 'Q4 push'),
-  ('22222222-2222-2222-2222-222222222222', 'sessions', 40000,
-   (current_date + interval '120 days')::date, null);
-
-insert into public.annotations (site_id, event_date, label, kind)
-values
-  ('11111111-1111-1111-1111-111111111111',
-   (current_date - interval '21 days')::date, 'Republished top 10 recipes', 'content'),
-  ('11111111-1111-1111-1111-111111111111',
-   (current_date - interval '9 days')::date, 'New recipe schema markup', 'seo'),
-  (null, (current_date - interval '14 days')::date,
-   'Google core update (seed example)', 'other');
-
 insert into public.tracked_queries (site_id, query)
 select '11111111-1111-1111-1111-111111111111', q
 from (values ('aurora recipes'), ('easy dinner ideas')) as t(q);

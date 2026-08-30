@@ -1,5 +1,7 @@
 # Site Analytics
 
+[![CI](https://github.com/jafforgehq/site-analytics-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/jafforgehq/site-analytics-tool/actions/workflows/ci.yml)
+
 Self-hosted dashboard for monitoring Google Analytics 4, Google Search Console, and Bing Webmaster Tools across multiple websites.
 
 It gives a solo publisher or small portfolio operator one private place to see traffic, search performance, data coverage, integration health, sync history, and the sites that need attention.
@@ -22,13 +24,11 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - Email/password sign-in with mandatory TOTP MFA before dashboard data can be read.
 - Supabase Row Level Security: browser reads require both an allowlisted admin and an MFA-verified (`aal2`) session.
 - CSV/ZIP and PDF exports, plus a privacy mode for screensharing.
-- One-click full-portfolio export (JSON) for feeding into an AI agent: every table plus derived insights, forecasts, and goal projections in one file.
+- One-click full-portfolio export (JSON) for feeding into an AI agent: every table plus derived insights and forecasts in one file.
 - Light, dark, and system theme with a per-device preference.
-- Traffic trajectory forecasting (Holt-Winters with weekly seasonality, computed locally) with confidence bands on charts.
-- Per-site goals ("10,000 Google clicks a month by December") scored against the forecast: on track, at risk, off track.
+- Traffic trajectory forecasting (Holt-Winters with weekly seasonality, computed locally) with confidence bands on charts, for every metric and the whole portfolio combined.
 - Content refresh queue: pages whose Google clicks decayed ≥25% versus their own prior 28 days, ranked by lost volume.
 - Lightweight query rank tracking: star Search Console queries and chart their average position over time - no scraping, no extra API calls.
-- Chart annotations for deploys, content pushes, and SEO changes, so traffic shifts have explanations.
 - Hourly uptime checks of each site's public URL with a 7-day availability view.
 - AI briefing (coming soon): the backend is built and safe to deploy today, but not yet wired into the UI.
 
@@ -160,7 +160,7 @@ Create a new Supabase project in the dashboard. In **Project Settings → API**,
 
 Then apply the database migrations. They create the tables, RLS policies, Edge Functions' database permissions, scheduled cron jobs, and retention jobs.
 
-Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0009`), paste its contents into a new query, and run it - one file at a time, in order.
+Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0010`), paste its contents into a new query, and run it - one file at a time, in order.
 
 Afterwards, open **Integrations → Cron → Jobs**: five jobs (three daily syncs, an hourly uptime check, and a weekly cleanup) should be listed. Scheduled syncs will report configuration errors until the secrets in the next steps exist; they do not affect an unrelated project.
 
@@ -310,7 +310,7 @@ Then sign out, sign back in, and the app shows a fresh QR. Because TOTP secrets 
 - Browser-readable data requires an allowlisted admin and MFA at assurance level `aal2`.
 - All provider writes use Supabase Edge Functions with server-side credentials.
 - Errors are sanitized before storage and display.
-- New v2 tables (goals, annotations, tracked queries, uptime checks) follow the same model: browser reads require admin + `aal2`; all writes go through the `manage-portfolio` Edge Function with server-side caps on row counts and input sizes.
+- The v2 tables (tracked queries, uptime checks) follow the same model: browser reads require admin + `aal2`; all writes go through the `manage-portfolio` Edge Function with server-side caps on row counts and input sizes.
 - The uptime prober only fetches `http(s)` URLs already stored in the admin-managed sites table, with a 10 s timeout, bounded concurrency, and 90-day self-pruning retention.
 - The AI briefing endpoint requires admin + `aal2`, refuses when no `ANTHROPIC_API_KEY` secret is set, size-caps its input, and sanitizes provider errors so credentials can never leak.
 - Local seed data is synthetic. `supabase db reset` resets only the local Docker database unless you deliberately target a hosted project with other CLI commands.

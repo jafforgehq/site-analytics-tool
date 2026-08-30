@@ -3,7 +3,6 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,11 +21,6 @@ export interface ChartSeries {
   dashed?: boolean;
 }
 
-export interface ChartAnnotation {
-  date: string;
-  label: string;
-}
-
 export type ChartRow = { date: string } & Record<
   string,
   number | null | string | [number, number] | undefined
@@ -36,7 +30,7 @@ export type ChartRow = { date: string } & Record<
  * Responsive multi-series line chart with a consistent date axis. Missing days
  * are rendered as gaps (connectNulls=false) to avoid misleading interpolation.
  * Optionally renders a forecast confidence band (`bandKey` rows hold
- * [lower, upper]) and vertical annotation markers.
+ * [lower, upper]).
  */
 export function MetricLineChart({
   data,
@@ -44,14 +38,12 @@ export function MetricLineChart({
   height = 240,
   bandKey,
   bandColor,
-  annotations = [],
 }: {
   data: ChartRow[];
   series: ChartSeries[];
   height?: number;
   bandKey?: string;
   bandColor?: string;
-  annotations?: ChartAnnotation[];
 }) {
   const hasData = data.some((row) =>
     series.some((s) => typeof row[s.key] === "number"),
@@ -66,9 +58,6 @@ export function MetricLineChart({
       />
     );
   }
-
-  const dates = new Set(data.map((row) => row.date));
-  const visibleAnnotations = annotations.filter((a) => dates.has(a.date));
 
   return (
     <div style={{ width: "100%", height }}>
@@ -123,20 +112,6 @@ export function MetricLineChart({
               activeDot={false}
             />
           )}
-          {visibleAnnotations.map((a) => (
-            <ReferenceLine
-              key={`${a.date}-${a.label}`}
-              x={a.date}
-              stroke="hsl(var(--muted-foreground))"
-              strokeDasharray="4 4"
-              label={{
-                value: a.label,
-                position: "insideTopRight",
-                fontSize: 10,
-                fill: "hsl(var(--muted-foreground))",
-              }}
-            />
-          ))}
           {series.map((s) => (
             <Line
               key={s.key}

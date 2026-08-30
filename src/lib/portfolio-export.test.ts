@@ -6,7 +6,6 @@ import type {
   SearchDaily,
   SearchPageDaily,
   Site,
-  SiteGoal,
 } from "@/types/database";
 
 const NOW = new Date("2026-08-30T12:00:00Z");
@@ -91,7 +90,6 @@ describe("buildExportComputed", () => {
       analytics,
       search,
       searchPage: [],
-      goals: [],
       now: NOW,
     });
     expect(Object.keys(result.insights).sort()).toEqual(["180", "30", "90"]);
@@ -105,7 +103,6 @@ describe("buildExportComputed", () => {
       analytics,
       search,
       searchPage: [],
-      goals: [],
       now: NOW,
     });
     const sessions = result.portfolio_trajectory.find(
@@ -124,7 +121,6 @@ describe("buildExportComputed", () => {
       analytics,
       search,
       searchPage: [],
-      goals: [],
       now: NOW,
     });
     expect(result.site_trajectories.map((t) => t.site_id).sort()).toEqual([
@@ -136,47 +132,6 @@ describe("buildExportComputed", () => {
     expect(
       aurora.trajectories.find((t) => t.key === "sessions")!.forecast,
     ).not.toBeNull();
-  });
-
-  it("resolves goal projections against the correct site's own series", () => {
-    const goals: SiteGoal[] = [
-      {
-        id: "g1",
-        site_id: "a",
-        metric: "sessions",
-        target_value: 1,
-        target_date: dateAt(-30),
-        note: "easy target",
-        created_at: NOW.toISOString(),
-        updated_at: NOW.toISOString(),
-      },
-      {
-        id: "g2",
-        site_id: "b",
-        metric: "clicks",
-        target_value: 1_000_000,
-        target_date: dateAt(-30),
-        note: null,
-        created_at: NOW.toISOString(),
-        updated_at: NOW.toISOString(),
-      },
-    ];
-    const result = buildExportComputed({
-      sites,
-      statuses,
-      analytics,
-      search,
-      searchPage: [],
-      goals,
-      now: NOW,
-    });
-    expect(result.goal_projections).toHaveLength(2);
-    const easy = result.goal_projections.find((g) => g.goal_id === "g1")!;
-    const hard = result.goal_projections.find((g) => g.goal_id === "g2")!;
-    expect(easy.site_name).toBe("Aurora");
-    expect(easy.projection.status).toBe("achieved");
-    expect(hard.site_name).toBe("Borealis");
-    expect(hard.projection.status).toBe("off_track");
   });
 
   it("computes a refresh queue from page-level rows across active sites", () => {
@@ -199,7 +154,6 @@ describe("buildExportComputed", () => {
       analytics,
       search,
       searchPage,
-      goals: [],
       now: NOW,
     });
     expect(result.refresh_queue).toHaveLength(1);

@@ -8,7 +8,6 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   MetricLineChart,
-  type ChartAnnotation,
   type ChartRow,
 } from "@/components/charts/MetricLineChart";
 import { CHART_COLORS } from "@/components/charts/chart-colors";
@@ -23,13 +22,11 @@ import { cn } from "@/lib/utils";
 export function TrajectoryPanel({
   title,
   trajectories,
-  annotations = [],
   horizonDays,
   maskPrefix,
 }: {
   title: string;
   trajectories: TrajectoryMetricResult[];
-  annotations?: ChartAnnotation[];
   horizonDays: number;
   maskPrefix: string;
 }) {
@@ -94,7 +91,6 @@ export function TrajectoryPanel({
       ) : (
         <TrajectoryMetricChart
           metric={selected}
-          annotations={annotations}
           horizonDays={horizonDays}
           maskPrefix={`${maskPrefix}:${selected.key}`}
         />
@@ -105,12 +101,10 @@ export function TrajectoryPanel({
 
 function TrajectoryMetricChart({
   metric,
-  annotations,
   horizonDays,
   maskPrefix,
 }: {
   metric: TrajectoryMetricResult;
-  annotations: ChartAnnotation[];
   horizonDays: number;
   maskPrefix: string;
 }) {
@@ -218,7 +212,6 @@ function TrajectoryMetricChart({
           <MetricLineChart
             data={rows}
             bandKey="band"
-            annotations={annotations}
             series={[
               {
                 key: metric.label,
