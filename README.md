@@ -23,6 +23,13 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - Supabase Row Level Security: browser reads require both an allowlisted admin and an MFA-verified (`aal2`) session.
 - CSV/ZIP and PDF exports, plus a privacy mode for screensharing.
 - Light, dark, and system theme with a per-device preference.
+- Traffic trajectory forecasting (Holt-Winters with weekly seasonality, computed locally) with confidence bands on charts.
+- Per-site goals ("10,000 Google clicks a month by December") scored against the forecast: on track, at risk, off track.
+- Content refresh queue: pages whose Google clicks decayed ≥25% versus their own prior 28 days, ranked by lost volume.
+- Lightweight query rank tracking: star Search Console queries and chart their average position over time - no scraping, no extra API calls.
+- Chart annotations for deploys, content pushes, and SEO changes, so traffic shifts have explanations.
+- Hourly uptime checks of each site's public URL with a 7-day availability view.
+- Optional on-demand AI briefing (bring your own Anthropic API key; off until configured).
 
 ## Product tour
 
@@ -152,9 +159,9 @@ Create a new Supabase project in the dashboard. In **Project Settings → API**,
 
 Then apply the database migrations. They create the tables, RLS policies, Edge Functions' database permissions, scheduled cron jobs, and retention jobs.
 
-Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0008`), paste its contents into a new query, and run it - one file at a time, in order.
+Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0009`), paste its contents into a new query, and run it - one file at a time, in order.
 
-Afterwards, open **Integrations → Cron → Jobs**: four jobs (three daily syncs plus a weekly cleanup) should be listed. Scheduled syncs will report configuration errors until the secrets in the next steps exist; they do not affect an unrelated project.
+Afterwards, open **Integrations → Cron → Jobs**: five jobs (three daily syncs, an hourly uptime check, and a weekly cleanup) should be listed. Scheduled syncs will report configuration errors until the secrets in the next steps exist; they do not affect an unrelated project.
 
 ### 2. Configure Google Cloud and mint a refresh token
 
@@ -203,19 +210,22 @@ ALLOWED_APP_ORIGIN=https://monitor.example.com
 
 ### 5. Deploy the Edge Functions - the one terminal step
 
-This is the **only** part that isn't point-and-click. The five functions - `manage-sites`, `manual-sync`, `scheduled-sync-gsc`, `scheduled-sync-ga4`, `scheduled-sync-bing` - share helpers in [`supabase/functions/_shared/`](supabase/functions/_shared) (imported as `../_shared/...`), and the dashboard's in-browser editor deploys one function in isolation, so it can't resolve those shared imports. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) bundles the shared code automatically, so run this once from a clone of the repo:
+This is the **only** part that isn't point-and-click. The eight functions - `manage-sites`, `manage-portfolio`, `manual-sync`, `scheduled-sync-gsc`, `scheduled-sync-ga4`, `scheduled-sync-bing`, `scheduled-uptime`, `ai-briefing` - share helpers in [`supabase/functions/_shared/`](supabase/functions/_shared) (imported as `../_shared/...`), and the dashboard's in-browser editor deploys one function in isolation, so it can't resolve those shared imports. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) bundles the shared code automatically, so run this once from a clone of the repo:
 
 ```bash
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 supabase functions deploy manage-sites
+supabase functions deploy manage-portfolio
 supabase functions deploy manual-sync
 supabase functions deploy scheduled-sync-gsc
 supabase functions deploy scheduled-sync-ga4
 supabase functions deploy scheduled-sync-bing
+supabase functions deploy scheduled-uptime
+supabase functions deploy ai-briefing
 ```
 
-Then confirm all five appear under **Edge Functions** in the dashboard. After this one step, everything else is back in the browser.
+Then confirm all eight appear under **Edge Functions** in the dashboard. After this one step, everything else is back in the browser.
 
 ### 6. Lock down Supabase Auth and create your admin
 
@@ -272,6 +282,21 @@ From the **Sites** page, add each website and enter only the identifiers you use
 
 Configured integrations enable automatically. Use a manual sync for the first import, then inspect **Sync history** and **Integration health** before trusting scheduled data.
 
+### 9. Optional: enable AI briefings
+
+The overview page has a "Generate briefing" button that turns the portfolio's aggregate numbers into a short analyst-style narrative using the Claude API. It is **off by default** and stays off until you add one Edge Function secret:
+
+```
+ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY
+```
+
+Notes:
+
+- Briefings run **only when you click the button** - never on a schedule.
+- Only aggregate data leaves your project (KPIs, site names, movers, goal status), size-capped server-side; the key itself never reaches the browser.
+- Each briefing is a single, output-capped API call you pay Anthropic for directly. `AI_BRIEFING_MODEL` overrides the default model (`claude-opus-5`) if you prefer a cheaper one.
+- Without the secret, the button simply explains how to enable the feature.
+
 ## Two-factor authentication
 
 TOTP two-factor auth is **mandatory**: browser reads require an MFA-verified (`aal2`) session, enforced in the database by Row Level Security. A valid password alone yields an empty dashboard. It is fully Supabase-native - Supabase generates the secret and QR code server-side, and no external 2FA service (SMS gateway, Authy, etc.) is involved. Any standard TOTP app works (Google Authenticator, Authy, 1Password, and so on).
@@ -295,6 +320,9 @@ Then sign out, sign back in, and the app shows a fresh QR. Because TOTP secrets 
 - Browser-readable data requires an allowlisted admin and MFA at assurance level `aal2`.
 - All provider writes use Supabase Edge Functions with server-side credentials.
 - Errors are sanitized before storage and display.
+- New v2 tables (goals, annotations, tracked queries, uptime checks) follow the same model: browser reads require admin + `aal2`; all writes go through the `manage-portfolio` Edge Function with server-side caps on row counts and input sizes.
+- The uptime prober only fetches `http(s)` URLs already stored in the admin-managed sites table, with a 10 s timeout, bounded concurrency, and 90-day self-pruning retention.
+- The AI briefing endpoint requires admin + `aal2`, refuses when no `ANTHROPIC_API_KEY` secret is set, size-caps its input, and sanitizes provider errors so credentials can never leak.
 - Local seed data is synthetic. `supabase db reset` resets only the local Docker database unless you deliberately target a hosted project with other CLI commands.
 
 ## Commands
@@ -313,7 +341,7 @@ Then sign out, sign back in, and the app shows a fresh QR. Because TOTP secrets 
 
 - One administrator and one portfolio per deployment.
 - No public signup, team roles, billing, alerts, or multi-organization isolation.
-- Uses daily aggregate data; it is not a full keyword-rank tracker or website crawler.
+- Uses daily aggregate data; tracked-query positions come from Search Console's daily top queries, so it is not a full keyword-rank tracker or website crawler.
 - Google and Bing provider quotas, permissions, and API changes are controlled by those providers.
 - Authenticator (2FA) devices are managed from the SQL editor, not the app UI - see [Two-factor authentication](#two-factor-authentication).
 

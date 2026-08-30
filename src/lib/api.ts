@@ -5,15 +5,21 @@ import { computeInsights, type InsightsResult } from "@/lib/insights";
 import { aggregateBreakdown, type TermRow } from "@/lib/search-terms";
 import type {
   AnalyticsDaily,
+  Annotation,
+  AnnotationKind,
+  GoalMetric,
   IntegrationStatus,
   SearchDaily,
   SearchPageDaily,
   SearchQueryDaily,
   Site,
+  SiteGoal,
   SyncRun,
   SyncSource,
   SyncStatus,
+  TrackedQuery,
   TriggerType,
+  UptimeCheck,
 } from "@/types/database";
 
 // Centralized data access. UI components never call supabase directly - they
@@ -387,6 +393,9 @@ export async function deleteSite(id: string): Promise<void> {
  */
 export interface InsightsWithSites extends InsightsResult {
   sitesWithStatuses: SiteWithStatuses[];
+  /** The raw daily rows behind the computation - already fetched, kept so
+   * downstream features (goal projections, briefing) can reuse them. */
+  raw: { analytics: AnalyticsDaily[]; search: SearchDaily[] };
 }
 
 /**
@@ -427,6 +436,7 @@ export async function getInsights(days: number): Promise<InsightsWithSites> {
       ...site,
       statuses: byId.get(site.id) ?? [],
     })),
+    raw: { analytics, search },
   };
 }
 
@@ -578,4 +588,312 @@ export async function runCleanup(dryRun: boolean): Promise<CleanupResult> {
   });
   if (error) throw error;
   return data as unknown as CleanupResult;
+}
+
+// ---------------------------------------------------------------------------
+// V2: goals, annotations, tracked queries, uptime, decay, AI briefing
+// ---------------------------------------------------------------------------
+
+export class PortfolioActionError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public status?: number,
+  ) {
+    super(message);
+    this.name = "PortfolioActionError";
+  }
+}
+
+/** Invoke an Edge Function and unwrap its sanitized error payload. */
+async function invokeFunction<T>(
+  name: string,
+  body: Record<string, unknown>,
+  fallbackMessage: string,
+): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>(name, { body });
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    let status: number | undefined;
+    let code = "error";
+    let message = fallbackMessage;
+    if (ctx && typeof ctx.json === "function") {
+      status = ctx.status;
+      try {
+        const payload = (await ctx.clone().json()) as {
+          error?: string;
+          message?: string;
+        };
+        code = payload.error ?? code;
+        message = payload.message ?? message;
+      } catch {
+        // non-JSON body - keep generic message
+      }
+    }
+    throw new PortfolioActionError(code, message, status);
+  }
+  return data as T;
+}
+
+// Goals -----------------------------------------------------------------------
+export async function getSiteGoals(siteId: string): Promise<SiteGoal[]> {
+  const { data, error } = await supabase
+    .from("site_goals")
+    .select("*")
+    .eq("site_id", siteId)
+    .order("target_date");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getAllGoals(): Promise<SiteGoal[]> {
+  const { data, error } = await supabase
+    .from("site_goals")
+    .select("*")
+    .order("target_date");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export interface GoalFormValues {
+  siteId: string;
+  metric: GoalMetric;
+  targetValue: number;
+  targetDate: string;
+  note?: string;
+}
+
+export async function createGoal(values: GoalFormValues): Promise<SiteGoal> {
+  const result = await invokeFunction<{ ok: boolean; goal: SiteGoal }>(
+    "manage-portfolio",
+    { action: "goal.create", goal: values },
+    "Could not create the goal.",
+  );
+  return result.goal;
+}
+
+export async function deleteGoal(id: string): Promise<void> {
+  await invokeFunction(
+    "manage-portfolio",
+    { action: "goal.delete", id },
+    "Could not delete the goal.",
+  );
+}
+
+// Annotations -----------------------------------------------------------------
+/** Annotations relevant to a site: its own plus portfolio-wide ones. Pass no
+ * siteId for every annotation. */
+export async function getAnnotations(siteId?: string): Promise<Annotation[]> {
+  let query = supabase
+    .from("annotations")
+    .select("*")
+    .order("event_date", { ascending: false });
+  if (siteId) query = query.or(`site_id.eq.${siteId},site_id.is.null`);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export interface AnnotationFormValues {
+  siteId: string | null;
+  eventDate: string;
+  label: string;
+  kind: AnnotationKind;
+}
+
+export async function createAnnotation(
+  values: AnnotationFormValues,
+): Promise<Annotation> {
+  const result = await invokeFunction<{ ok: boolean; annotation: Annotation }>(
+    "manage-portfolio",
+    { action: "annotation.create", annotation: values },
+    "Could not create the annotation.",
+  );
+  return result.annotation;
+}
+
+export async function deleteAnnotation(id: string): Promise<void> {
+  await invokeFunction(
+    "manage-portfolio",
+    { action: "annotation.delete", id },
+    "Could not delete the annotation.",
+  );
+}
+
+// Tracked queries -------------------------------------------------------------
+export async function getTrackedQueries(
+  siteId: string,
+): Promise<TrackedQuery[]> {
+  const { data, error } = await supabase
+    .from("tracked_queries")
+    .select("*")
+    .eq("site_id", siteId)
+    .order("created_at");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function addTrackedQuery(
+  siteId: string,
+  query: string,
+): Promise<void> {
+  await invokeFunction(
+    "manage-portfolio",
+    { action: "tracked-query.add", trackedQuery: { siteId, query } },
+    "Could not track the query.",
+  );
+}
+
+export async function removeTrackedQuery(
+  siteId: string,
+  query: string,
+): Promise<void> {
+  await invokeFunction(
+    "manage-portfolio",
+    { action: "tracked-query.remove", trackedQuery: { siteId, query } },
+    "Could not untrack the query.",
+  );
+}
+
+/** Daily history (from search_query_daily) for a site's tracked queries. */
+export async function getTrackedQueryHistory(
+  siteId: string,
+  days: number,
+): Promise<{ tracked: TrackedQuery[]; history: SearchQueryDaily[] }> {
+  const tracked = await getTrackedQueries(siteId);
+  if (tracked.length === 0) return { tracked, history: [] };
+  const since = format(subDays(new Date(), days), "yyyy-MM-dd");
+  const history = await fetchAllPages<SearchQueryDaily>(() =>
+    supabase
+      .from("search_query_daily")
+      .select("*")
+      .eq("site_id", siteId)
+      .eq("engine", "google")
+      .in(
+        "query",
+        tracked.map((t) => t.query),
+      )
+      .gte("metric_date", since)
+      .order("metric_date"),
+  );
+  return { tracked, history };
+}
+
+// Uptime ----------------------------------------------------------------------
+export interface UptimeSummary {
+  siteId: string;
+  checks: number;
+  upPct: number | null;
+  lastCheckAt: string | null;
+  lastOk: boolean | null;
+  lastStatusCode: number | null;
+  lastLatencyMs: number | null;
+  recent: UptimeCheck[]; // newest first, bounded
+}
+
+/** Per-site uptime over the last 7 days, newest check first. */
+export async function getUptimeSummaries(): Promise<
+  Map<string, UptimeSummary>
+> {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const rows = await fetchAllPages<UptimeCheck>(() =>
+    supabase
+      .from("uptime_checks")
+      .select("*")
+      .gte("checked_at", since)
+      .order("checked_at", { ascending: false }),
+  );
+
+  const map = new Map<string, UptimeSummary>();
+  for (const row of rows) {
+    let summary = map.get(row.site_id);
+    if (!summary) {
+      summary = {
+        siteId: row.site_id,
+        checks: 0,
+        upPct: null,
+        lastCheckAt: row.checked_at,
+        lastOk: row.ok,
+        lastStatusCode: row.status_code,
+        lastLatencyMs: row.latency_ms,
+        recent: [],
+      };
+      map.set(row.site_id, summary);
+    }
+    summary.checks += 1;
+    if (summary.recent.length < 48) summary.recent.push(row);
+  }
+  for (const summary of map.values()) {
+    const up = summary.recent.length
+      ? rows.filter((r) => r.site_id === summary.siteId && r.ok).length
+      : 0;
+    summary.upPct = summary.checks > 0 ? (up / summary.checks) * 100 : null;
+  }
+  return map;
+}
+
+// Decaying content ------------------------------------------------------------
+/** Raw per-page daily rows for the decay computation (2× window). */
+export async function getSitePageDaily(
+  siteId: string,
+  days: number,
+): Promise<SearchPageDaily[]> {
+  const since = format(subDays(new Date(), days * 2), "yyyy-MM-dd");
+  return fetchAllPages<SearchPageDaily>(() =>
+    supabase
+      .from("search_page_daily")
+      .select("*")
+      .eq("site_id", siteId)
+      .eq("engine", "google")
+      .gte("metric_date", since)
+      .order("metric_date"),
+  );
+}
+
+/** Page rows for every site (portfolio refresh queue). */
+export async function getPortfolioPageDaily(
+  days: number,
+): Promise<SearchPageDaily[]> {
+  const since = format(subDays(new Date(), days * 2), "yyyy-MM-dd");
+  return fetchAllPages<SearchPageDaily>(() =>
+    supabase
+      .from("search_page_daily")
+      .select("*")
+      .eq("engine", "google")
+      .gte("metric_date", since)
+      .order("metric_date"),
+  );
+}
+
+// AI briefing -----------------------------------------------------------------
+export interface AiBriefingResult {
+  configured: boolean;
+  briefing: string | null;
+  model: string | null;
+}
+
+export async function getAiBriefing(
+  days: number,
+  summary: Record<string, unknown>,
+): Promise<AiBriefingResult> {
+  const result = await invokeFunction<{
+    ok: boolean;
+    error?: string;
+    briefing?: string;
+    model?: string;
+  }>("ai-briefing", { days, summary }, "Could not generate the briefing.");
+  if (!result.ok && result.error === "not_configured") {
+    return { configured: false, briefing: null, model: null };
+  }
+  if (!result.ok || !result.briefing) {
+    throw new PortfolioActionError(
+      result.error ?? "error",
+      "Could not generate the briefing.",
+    );
+  }
+  return {
+    configured: true,
+    briefing: result.briefing,
+    model: result.model ?? null,
+  };
 }

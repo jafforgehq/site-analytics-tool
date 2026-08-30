@@ -1,4 +1,9 @@
-import { useSiteSearchTerms } from "@/lib/hooks";
+import { Star } from "lucide-react";
+import {
+  useSiteSearchTerms,
+  useTrackedQueryHistory,
+  useTrackQuery,
+} from "@/lib/hooks";
 import type { TermRow } from "@/lib/search-terms";
 import { Card } from "@/components/ui/card";
 import { MetricDelta } from "@/components/ui/stat-card";
@@ -18,6 +23,11 @@ export function SearchTermsSection({
   days: number;
 }) {
   const { data, isLoading, isError } = useSiteSearchTerms(siteId, days);
+  const trackedQuery = useTrackedQueryHistory(siteId, days);
+  const trackMutation = useTrackQuery(siteId);
+  const trackedSet = new Set(
+    (trackedQuery.data?.tracked ?? []).map((t) => t.query),
+  );
 
   if (isLoading) return <Skeleton className="h-64" />;
   if (isError || !data) return null; // non-critical; the rest of the page still works
@@ -42,6 +52,8 @@ export function SearchTermsSection({
         keyHeader="Query"
         rows={data.queries.slice(0, TOP_N)}
         tableKey={`${siteId}:${days}:queries`}
+        trackedSet={trackedSet}
+        onToggleTrack={(query, track) => trackMutation.mutate({ query, track })}
       />
       <TermsTable
         title="Top pages"
@@ -91,12 +103,16 @@ function TermsTable({
   rows,
   tableKey,
   isPage = false,
+  trackedSet,
+  onToggleTrack,
 }: {
   title: string;
   keyHeader: string;
   rows: TermRow[];
   tableKey: string;
   isPage?: boolean;
+  trackedSet?: Set<string>;
+  onToggleTrack?: (query: string, track: boolean) => void;
 }) {
   const privacy = usePrivacyMode();
   return (
@@ -124,6 +140,37 @@ function TermsTable({
                   >
                     <td className="max-w-[14rem] px-3 py-2">
                       <div className="flex items-center gap-1.5">
+                        {onToggleTrack && trackedSet && (
+                          <button
+                            type="button"
+                            aria-label={
+                              trackedSet.has(row.key)
+                                ? "Stop tracking this query"
+                                : "Track this query's position"
+                            }
+                            aria-pressed={trackedSet.has(row.key)}
+                            className={cn(
+                              "shrink-0 transition-colors",
+                              trackedSet.has(row.key)
+                                ? "text-warning"
+                                : "text-muted-foreground/40 hover:text-warning",
+                            )}
+                            disabled={privacy.enabled}
+                            onClick={() =>
+                              onToggleTrack(row.key, !trackedSet.has(row.key))
+                            }
+                          >
+                            <Star
+                              className="h-3.5 w-3.5"
+                              fill={
+                                trackedSet.has(row.key)
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                              aria-hidden
+                            />
+                          </button>
+                        )}
                         <span
                           className="truncate"
                           title={

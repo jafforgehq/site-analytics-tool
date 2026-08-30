@@ -5,7 +5,21 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  addTrackedQuery,
+  createAnnotation,
+  createGoal,
+  deleteAnnotation,
+  deleteGoal,
+  getAiBriefing,
+  getAllGoals,
+  getAnnotations,
   getIntegrationStatuses,
+  getPortfolioPageDaily,
+  getSiteGoals,
+  getSitePageDaily,
+  getTrackedQueryHistory,
+  getUptimeSummaries,
+  removeTrackedQuery,
   getSite,
   getSiteMetrics,
   getSites,
@@ -35,6 +49,15 @@ export const queryKeys = {
     ["integration-statuses", siteId ?? null] as const,
   syncRuns: (filters: SyncRunFilters) => ["sync-runs", filters] as const,
   dbUsage: ["db-usage"] as const,
+  siteGoals: (siteId: string) => ["site-goals", siteId] as const,
+  allGoals: ["site-goals", "all"] as const,
+  annotations: (siteId?: string) => ["annotations", siteId ?? "all"] as const,
+  trackedQueryHistory: (siteId: string, days: number) =>
+    ["tracked-query-history", siteId, days] as const,
+  uptime: ["uptime"] as const,
+  sitePageDaily: (siteId: string, days: number) =>
+    ["site-page-daily", siteId, days] as const,
+  portfolioPageDaily: (days: number) => ["portfolio-page-daily", days] as const,
 };
 
 export function useSites() {
@@ -147,5 +170,121 @@ export function useManualSync(siteId: string) {
       qc.invalidateQueries({ queryKey: ["insights"] });
       qc.invalidateQueries({ queryKey: ["integration-statuses"] });
     },
+  });
+}
+
+// V2 hooks --------------------------------------------------------------------
+
+export function useSiteGoals(siteId: string) {
+  return useQuery({
+    queryKey: queryKeys.siteGoals(siteId),
+    queryFn: () => getSiteGoals(siteId),
+    enabled: !!siteId,
+  });
+}
+
+export function useAllGoals() {
+  return useQuery({ queryKey: queryKeys.allGoals, queryFn: getAllGoals });
+}
+
+export function useCreateGoal(siteId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: createGoal,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.siteGoals(siteId) });
+      qc.invalidateQueries({ queryKey: ["site-goals"] });
+    },
+  });
+}
+
+export function useDeleteGoal(siteId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteGoal,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.siteGoals(siteId) });
+      qc.invalidateQueries({ queryKey: ["site-goals"] });
+    },
+  });
+}
+
+export function useAnnotations(siteId?: string) {
+  return useQuery({
+    queryKey: queryKeys.annotations(siteId),
+    queryFn: () => getAnnotations(siteId),
+  });
+}
+
+export function useCreateAnnotation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: createAnnotation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["annotations"] });
+    },
+  });
+}
+
+export function useDeleteAnnotation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAnnotation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["annotations"] });
+    },
+  });
+}
+
+export function useTrackedQueryHistory(siteId: string, days: number) {
+  return useQuery({
+    queryKey: queryKeys.trackedQueryHistory(siteId, days),
+    queryFn: () => getTrackedQueryHistory(siteId, days),
+    enabled: !!siteId,
+  });
+}
+
+export function useTrackQuery(siteId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { query: string; track: boolean }) =>
+      args.track
+        ? addTrackedQuery(siteId, args.query)
+        : removeTrackedQuery(siteId, args.query),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tracked-query-history", siteId] });
+    },
+  });
+}
+
+export function useUptimeSummaries() {
+  return useQuery({
+    queryKey: queryKeys.uptime,
+    queryFn: getUptimeSummaries,
+    // A new check lands at most hourly - no need to refetch aggressively.
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSitePageDaily(siteId: string, days: number) {
+  return useQuery({
+    queryKey: queryKeys.sitePageDaily(siteId, days),
+    queryFn: () => getSitePageDaily(siteId, days),
+    enabled: !!siteId,
+  });
+}
+
+export function usePortfolioPageDaily(days: number) {
+  return useQuery({
+    queryKey: queryKeys.portfolioPageDaily(days),
+    queryFn: () => getPortfolioPageDaily(days),
+  });
+}
+
+/** Generate an AI briefing on demand (never automatically - it costs money). */
+export function useAiBriefing() {
+  return useMutation({
+    mutationFn: (args: { days: number; summary: Record<string, unknown> }) =>
+      getAiBriefing(args.days, args.summary),
   });
 }

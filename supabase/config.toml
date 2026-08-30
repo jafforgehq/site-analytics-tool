@@ -90,5 +90,14 @@ verify_jwt = false
 [functions.scheduled-sync-bing]
 verify_jwt = false
 
+[functions.manage-portfolio]
+verify_jwt = false
+
+[functions.scheduled-uptime]
+verify_jwt = false
+
+[functions.ai-briefing]
+verify_jwt = false
+
 [analytics]
 enabled = false

@@ -17,6 +17,8 @@ export type SyncSource = "gsc" | "ga4" | "bing";
 export type SearchEngine = "google" | "bing";
 export type SyncStatus = "running" | "success" | "partial" | "failed";
 export type TriggerType = "scheduled" | "manual" | "backfill";
+export type GoalMetric = "sessions" | "clicks";
+export type AnnotationKind = "deploy" | "content" | "seo" | "other";
 
 export interface Database {
   public: {
@@ -277,6 +279,116 @@ export interface Database {
           },
         ];
       };
+      site_goals: {
+        Row: {
+          id: string;
+          site_id: string;
+          metric: GoalMetric;
+          target_value: number;
+          target_date: string;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          metric: GoalMetric;
+          target_value: number;
+          target_date: string;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["site_goals"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "site_goals_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      annotations: {
+        Row: {
+          id: string;
+          site_id: string | null;
+          event_date: string;
+          label: string;
+          kind: AnnotationKind;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id?: string | null;
+          event_date: string;
+          label: string;
+          kind?: AnnotationKind;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["annotations"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "annotations_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tracked_queries: {
+        Row: {
+          site_id: string;
+          query: string;
+          created_at: string;
+        };
+        Insert: {
+          site_id: string;
+          query: string;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["tracked_queries"]["Insert"]
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "tracked_queries_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      uptime_checks: {
+        Row: {
+          site_id: string;
+          checked_at: string;
+          ok: boolean;
+          status_code: number | null;
+          latency_ms: number | null;
+          error: string | null;
+        };
+        Insert: {
+          site_id: string;
+          checked_at?: string;
+          ok: boolean;
+          status_code?: number | null;
+          latency_ms?: number | null;
+          error?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["uptime_checks"]["Insert"]
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "uptime_checks_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -315,3 +427,7 @@ export type SearchQueryDaily = Tables<"search_query_daily">;
 export type SearchPageDaily = Tables<"search_page_daily">;
 export type SyncRun = Tables<"sync_runs">;
 export type IntegrationStatus = Tables<"integration_status">;
+export type SiteGoal = Tables<"site_goals">;
+export type Annotation = Tables<"annotations">;
+export type TrackedQuery = Tables<"tracked_queries">;
+export type UptimeCheck = Tables<"uptime_checks">;

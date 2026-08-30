@@ -17,6 +17,8 @@ import { InsightsFeed } from "@/features/dashboard/InsightsFeed";
 import { TopMovers } from "@/features/dashboard/TopMovers";
 import { ComparisonTable } from "@/features/dashboard/ComparisonTable";
 import { CoveragePanel } from "@/features/dashboard/CoveragePanel";
+import { RefreshQueue } from "@/features/dashboard/RefreshQueue";
+import { BriefingCard } from "@/features/dashboard/BriefingCard";
 import { cn } from "@/lib/utils";
 import { usePrivacyMode } from "@/lib/privacy";
 
@@ -85,6 +87,8 @@ export function OverviewPage() {
 
           <PortfolioKpis data={insights.data} />
 
+          <BriefingCard days={days} insights={insights.data} />
+
           <div className="grid gap-3 lg:grid-cols-2">
             <InsightsFeed insights={insights.data.insights} />
             <div className="space-y-3">
@@ -95,6 +99,8 @@ export function OverviewPage() {
               <CoveragePanel coverage={insights.data.coverage} />
             </div>
           </div>
+
+          <RefreshQueue sites={insights.data.sitesWithStatuses} />
 
           <section className="space-y-2">
             <h2 className="text-sm font-semibold">

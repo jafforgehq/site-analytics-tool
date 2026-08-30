@@ -2,6 +2,7 @@ import { useState } from "react";
 import { subDays, format } from "date-fns";
 import { Download } from "lucide-react";
 import {
+  getSiteGoals,
   getSiteMetrics,
   getSiteSearchTerms,
   getSyncRuns,
@@ -11,9 +12,13 @@ import {
   type SyncRunRow,
 } from "@/lib/api";
 import {
+  type ReportGoal,
+  type ReportTrajectory,
   type SiteReportRangePayload,
   type SiteReportDays,
 } from "@/lib/site-report-pdf";
+import { forecastSeries, projectGoal } from "@/lib/forecast";
+import { clicksSeries, sessionsSeries } from "@/lib/series";
 import { Button } from "@/components/ui/button";
 import { usePrivacyMode } from "@/lib/privacy";
 
@@ -251,7 +256,7 @@ export function SiteReportExportButton({ site }: { site: SiteWithStatuses }) {
     setError(null);
     try {
       const generatedAt = new Date();
-      const [reportModule, ranges, syncRuns] = await Promise.all([
+      const [reportModule, ranges, syncRuns, goals] = await Promise.all([
         import("@/lib/site-report-pdf"),
         Promise.all(
           SITE_REPORT_RANGES.map(
@@ -283,12 +288,57 @@ export function SiteReportExportButton({ site }: { site: SiteWithStatuses }) {
           since: format(subDays(generatedAt, 360), "yyyy-MM-dd"),
           limit: 25,
         }),
+        getSiteGoals(site.id).catch(() => []),
       ]);
+
+      // Forward view: forecast + goal projections from the widest range's
+      // rows (already fetched above). Skipped under privacy mode - masked
+      // series would produce a meaningless fake forecast.
+      let trajectory: ReportTrajectory | null = null;
+      let reportGoals: ReportGoal[] = [];
+      if (!privacy.enabled) {
+        const widest = ranges[ranges.length - 1];
+        const clicks = clicksSeries(widest.metrics.search);
+        const sessions = sessionsSeries(widest.metrics.analytics);
+        const clicksForecast = forecastSeries(clicks, 28);
+        const sessionsForecast = forecastSeries(sessions, 28);
+        const chosen = clicksForecast ?? sessionsForecast;
+        if (chosen) {
+          trajectory = {
+            metricName: clicksForecast ? "Google clicks" : "sessions",
+            horizonDays: 28,
+            horizonTotal: chosen.horizonTotal,
+            trendPerWeek: chosen.trendPerDay * 7,
+            method: chosen.method,
+          };
+        }
+        const today = format(generatedAt, "yyyy-MM-dd");
+        reportGoals = goals.map((goal) => {
+          const projection = projectGoal(
+            goal.metric === "sessions" ? sessions : clicks,
+            goal.target_value,
+            goal.target_date,
+            today,
+          );
+          return {
+            label: `${goal.metric === "sessions" ? "Sessions" : "Google clicks"}${
+              goal.note ? ` (${goal.note})` : ""
+            }`,
+            targetDate: goal.target_date,
+            status: projection.status,
+            current: projection.currentValue,
+            projected: projection.projectedValue,
+            target: goal.target_value,
+          };
+        });
+      }
 
       reportModule.saveSitePerformanceReport({
         site: maskSite(site, privacy),
         ranges: ranges.map((range) => maskRange(range, privacy)),
         syncRuns: maskRuns(syncRuns, privacy),
+        trajectory,
+        goals: reportGoals,
         generatedAt,
       });
     } catch (err) {

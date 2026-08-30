@@ -32,6 +32,11 @@ import { ManualSyncButtons } from "@/features/sites/ManualSyncButtons";
 import { SiteFormDialog } from "@/features/sites/SiteFormDialog";
 import { SearchTermsSection } from "@/features/sites/SearchTermsSection";
 import { SiteReportExportButton } from "@/features/sites/SiteReportExportButton";
+import { TrajectorySection } from "@/features/sites/TrajectorySection";
+import { GoalsSection } from "@/features/sites/GoalsSection";
+import { AnnotationsSection } from "@/features/sites/AnnotationsSection";
+import { TrackedQueriesSection } from "@/features/sites/TrackedQueriesSection";
+import { UptimeCard } from "@/features/sites/UptimeCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePrivacyMode } from "@/lib/privacy";
@@ -181,6 +186,8 @@ export function SiteDetailPage() {
         })}
       </div>
 
+      <UptimeCard siteId={site.id} />
+
       <ManualSyncButtons site={site} />
 
       {metricsQuery.isLoading ? (
@@ -188,12 +195,28 @@ export function SiteDetailPage() {
       ) : metricsQuery.isError ? (
         <ErrorState onRetry={() => void metricsQuery.refetch()} />
       ) : (
-        <MetricsSection
-          days={days}
-          analytics={metricsQuery.data?.analytics ?? []}
-          search={metricsQuery.data?.search ?? []}
-        />
+        <>
+          <TrajectorySection
+            siteId={siteId}
+            analytics={metricsQuery.data?.analytics ?? []}
+            search={metricsQuery.data?.search ?? []}
+          />
+          <GoalsSection
+            siteId={siteId}
+            analytics={metricsQuery.data?.analytics ?? []}
+            search={metricsQuery.data?.search ?? []}
+          />
+          <MetricsSection
+            days={days}
+            analytics={metricsQuery.data?.analytics ?? []}
+            search={metricsQuery.data?.search ?? []}
+          />
+        </>
       )}
+
+      <AnnotationsSection siteId={siteId} />
+
+      <TrackedQueriesSection siteId={siteId} days={days} />
 
       {/* Top queries & pages */}
       <SearchTermsSection siteId={siteId} days={days} />

@@ -30,10 +30,29 @@ export interface SiteReportRangePayload {
   termsError?: string;
 }
 
+export interface ReportTrajectory {
+  metricName: string;
+  horizonDays: number;
+  horizonTotal: number;
+  trendPerWeek: number;
+  method: "holt-winters" | "linear";
+}
+
+export interface ReportGoal {
+  label: string;
+  targetDate: string;
+  status: "achieved" | "on_track" | "at_risk" | "off_track";
+  current: number;
+  projected: number | null;
+  target: number;
+}
+
 export interface SitePerformanceReportInput {
   site: SiteWithStatuses;
   ranges: SiteReportRangePayload[];
   syncRuns: SyncRunRow[];
+  trajectory?: ReportTrajectory | null;
+  goals?: ReportGoal[];
   generatedAt?: Date;
 }
 
@@ -1147,6 +1166,100 @@ function addFooters(state: PdfState) {
   }
 }
 
+const GOAL_STATUS_LABEL: Record<ReportGoal["status"], string> = {
+  achieved: "Achieved",
+  on_track: "On track",
+  at_risk: "At risk",
+  off_track: "Off track",
+};
+
+const GOAL_STATUS_COLOR: Record<ReportGoal["status"], Rgb> = {
+  achieved: COLORS.emerald,
+  on_track: COLORS.emerald,
+  at_risk: COLORS.amber,
+  off_track: COLORS.rose,
+};
+
+function drawTrajectorySection(
+  state: PdfState,
+  trajectory: ReportTrajectory | null,
+  goals: ReportGoal[],
+) {
+  drawSectionTitle(state, "Trajectory & goals", "Forward view");
+
+  if (trajectory) {
+    drawKpiGrid(state, [
+      {
+        label: `Projected ${trajectory.metricName} (${trajectory.horizonDays}d)`,
+        value: fmtNumber(Math.round(trajectory.horizonTotal)),
+        color: COLORS.sky,
+        note:
+          trajectory.method === "holt-winters"
+            ? "Weekly-seasonal forecast"
+            : "Linear trend (short history)",
+      },
+      {
+        label: "Trend per week",
+        value: `${trajectory.trendPerWeek >= 0 ? "+" : ""}${fmtNumber(
+          Math.round(trajectory.trendPerWeek),
+        )}`,
+        color: trajectory.trendPerWeek >= 0 ? COLORS.emerald : COLORS.rose,
+        note: "Fitted daily trend × 7",
+      },
+      {
+        label: "Model",
+        value: trajectory.method === "holt-winters" ? "Holt-Winters" : "Linear",
+        color: COLORS.violet,
+        note: "Computed locally from stored daily data",
+      },
+    ]);
+    state.y += 6;
+  }
+
+  if (goals.length > 0) {
+    ensureSpace(state, 30 + goals.length * 22);
+    const { doc } = state;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    setText(doc, COLORS.ink);
+    doc.text("Goals (trailing 30-day totals)", MARGIN, state.y);
+    state.y += 16;
+
+    for (const goal of goals) {
+      ensureSpace(state, 22);
+      const y = state.y;
+      setFill(doc, GOAL_STATUS_COLOR[goal.status]);
+      doc.circle(MARGIN + 4, y - 3, 3, "F");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      setText(doc, COLORS.ink);
+      doc.text(
+        fitText(
+          doc,
+          `${goal.label} - target ${fmtNumber(goal.target)} by ${goal.targetDate}`,
+          state.width - MARGIN * 2 - 170,
+        ),
+        MARGIN + 14,
+        y,
+      );
+      setText(doc, COLORS.muted);
+      doc.text(
+        `${GOAL_STATUS_LABEL[goal.status]} · now ${fmtNumber(
+          Math.round(goal.current),
+        )}${
+          goal.projected != null
+            ? ` · proj. ${fmtNumber(Math.round(goal.projected))}`
+            : ""
+        }`,
+        state.width - MARGIN,
+        y,
+        { align: "right" },
+      );
+      state.y += 18;
+    }
+  }
+}
+
 export function createSitePerformanceReportPdf(
   input: SitePerformanceReportInput,
 ) {
@@ -1171,6 +1284,10 @@ export function createSitePerformanceReportPdf(
   if (primaryRange) {
     addPage(state);
     drawOpportunitySection(state, primaryRange);
+  }
+  if (input.trajectory || (input.goals && input.goals.length > 0)) {
+    addPage(state);
+    drawTrajectorySection(state, input.trajectory ?? null, input.goals ?? []);
   }
   addPage(state);
   drawHealthSection(state, input.site);

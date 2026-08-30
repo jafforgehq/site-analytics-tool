@@ -181,3 +181,48 @@ set
   last_error_message = 'Google Analytics API returned 403 (check property access)',
   next_run_at = (current_date + 1) + time '04:05'
 where i.site_id = '22222222-2222-2222-2222-222222222222' and i.source = 'ga4';
+
+-- ---------------------------------------------------------------------------
+-- V2 seed: goals, annotations, tracked queries, uptime checks
+-- ---------------------------------------------------------------------------
+insert into public.site_goals (site_id, metric, target_value, target_date, note)
+values
+  ('11111111-1111-1111-1111-111111111111', 'clicks', 12000,
+   (current_date + interval '75 days')::date, 'Q4 push'),
+  ('22222222-2222-2222-2222-222222222222', 'sessions', 40000,
+   (current_date + interval '120 days')::date, null);
+
+insert into public.annotations (site_id, event_date, label, kind)
+values
+  ('11111111-1111-1111-1111-111111111111',
+   (current_date - interval '21 days')::date, 'Republished top 10 recipes', 'content'),
+  ('11111111-1111-1111-1111-111111111111',
+   (current_date - interval '9 days')::date, 'New recipe schema markup', 'seo'),
+  (null, (current_date - interval '14 days')::date,
+   'Google core update (seed example)', 'other');
+
+insert into public.tracked_queries (site_id, query)
+select '11111111-1111-1111-1111-111111111111', q
+from (values ('aurora recipes'), ('easy dinner ideas')) as t(q);
+
+-- Hourly checks over the last 3 days; one brief synthetic outage.
+insert into public.uptime_checks (site_id, checked_at, ok, status_code, latency_ms, error)
+select
+  s.id,
+  ts,
+  not (s.id = '22222222-2222-2222-2222-222222222222'
+       and ts > now() - interval '26 hours'
+       and ts < now() - interval '24 hours'),
+  case when (s.id = '22222222-2222-2222-2222-222222222222'
+       and ts > now() - interval '26 hours'
+       and ts < now() - interval '24 hours') then 503 else 200 end,
+  120 + (abs(hashtext(s.id::text || ts::text)) % 400),
+  case when (s.id = '22222222-2222-2222-2222-222222222222'
+       and ts > now() - interval '26 hours'
+       and ts < now() - interval '24 hours') then 'http_503' else null end
+from public.sites s
+cross join generate_series(now() - interval '3 days', now(), interval '1 hour') as ts
+where s.id in (
+  '11111111-1111-1111-1111-111111111111',
+  '22222222-2222-2222-2222-222222222222'
+);
