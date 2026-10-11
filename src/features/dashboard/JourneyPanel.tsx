@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Rocket } from "lucide-react";
 import { usePortfolioSessions, useSites } from "@/lib/hooks";
-import { analyticsSeries } from "@/lib/series";
+import { premiumSessionsSeries } from "@/lib/series";
 import { computeJourneyProgress, journeyStatusLabel } from "@/lib/journey";
 import { formatNumber } from "@/lib/format";
 import { usePrivacyMode } from "@/lib/privacy";
@@ -31,7 +31,7 @@ export function JourneyPanel() {
       .map((site) => ({
         site,
         progress: computeJourneyProgress(
-          analyticsSeries(bySite.get(site.id) ?? [], "sessions"),
+          premiumSessionsSeries(bySite.get(site.id) ?? []),
         ),
       }))
       .sort((a, b) => b.progress.progress - a.progress.progress);
@@ -43,7 +43,7 @@ export function JourneyPanel() {
     <section className="space-y-2">
       <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
         <Rocket className="h-4 w-4" aria-hidden />
-        Mediavine Journey · 1,000 sessions / 30 days
+        Mediavine Journey · 1,000 premium sessions / 30 days
       </h2>
       <Card className="divide-y divide-border">
         {rows.map(({ site, progress }) => (

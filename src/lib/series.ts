@@ -24,6 +24,15 @@ export function analyticsSeries(
   return rows.map((r) => ({ date: r.metric_date, value: r[key] }));
 }
 
+/** Premium-country sessions; days not yet synced (null) are left out. */
+export function premiumSessionsSeries(rows: AnalyticsDaily[]): SeriesPoint[] {
+  return rows.flatMap((r) =>
+    r.premium_sessions == null
+      ? []
+      : [{ date: r.metric_date, value: r.premium_sessions }],
+  );
+}
+
 export function searchMetricSeries(
   rows: SearchDaily[],
   engine: SearchEngine,

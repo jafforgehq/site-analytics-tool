@@ -30,7 +30,7 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - Opportunity finders from Search Console data: queries stuck at positions 8-20, page-one queries with a weak CTR for their position, and queries where several of your own pages compete.
 - New-page tracker: how many days each newly published page took to earn its first click.
 - Indexing status per sitemap URL (Search Console URL Inspection API), weekly Core Web Vitals / PageSpeed, and daily alerts for traffic drops, downtime, failing syncs, and indexing problems.
-- Mediavine Journey tracker: rolling 30-day sessions against the 1,000-session minimum, with a projected eligibility date per site.
+- Mediavine Journey tracker: rolling 30-day premium sessions (US, UK, Canada, Australia) against the 1,000-session minimum, with a projected eligibility date per site.
 - Traffic trajectory forecasting (Holt-Winters with weekly seasonality, computed locally) with confidence bands on charts, for every metric and the whole portfolio combined.
 - Content refresh queue: pages whose Google clicks decayed ≥25% versus their own prior 28 days, ranked by lost volume.
 - Lightweight query rank tracking: star Search Console queries and chart their average position over time - no scraping, no extra API calls.
@@ -165,7 +165,7 @@ Create a new Supabase project in the dashboard. In **Project Settings → API**,
 
 Then apply the database migrations. They create the tables, RLS policies, Edge Functions' database permissions, scheduled cron jobs, and retention jobs.
 
-Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0011`), paste its contents into a new query, and run it - one file at a time, in order.
+Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0012`), paste its contents into a new query, and run it - one file at a time, in order.
 
 Afterwards, open **Integrations → Cron → Jobs**: nine jobs (three daily syncs, an hourly uptime check, a daily indexing check, a weekly Core Web Vitals check, a daily alert check, and two weekly cleanups) should be listed. Scheduled syncs will report configuration errors until the secrets in the next steps exist; they do not affect an unrelated project.
 

@@ -4,7 +4,10 @@
 import { format, parseISO } from "date-fns";
 import { forecastSeries, type SeriesPoint } from "@/lib/forecast";
 
-/** Mediavine Journey: 1,000 sessions per rolling month. */
+/**
+ * Mediavine Journey: 1,000 premium sessions per rolling month. Premium means
+ * US, UK, Canada and Australia traffic (see PREMIUM_COUNTRIES in the GA4 sync).
+ */
 export const JOURNEY_TARGET_SESSIONS = 1000;
 const WINDOW_DAYS = 30;
 const PROJECTION_DAYS = 180;
@@ -103,6 +106,6 @@ export function journeyStatusLabel(progress: JourneyProgress): string {
     case "unlikely":
       return "Not on pace within 6 months";
     default:
-      return "No data";
+      return "Waiting for premium-country data from the next GA4 sync";
   }
 }
