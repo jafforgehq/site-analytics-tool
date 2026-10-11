@@ -17,6 +17,13 @@ export type SyncSource = "gsc" | "ga4" | "bing";
 export type SearchEngine = "google" | "bing";
 export type SyncStatus = "running" | "success" | "partial" | "failed";
 export type TriggerType = "scheduled" | "manual" | "backfill";
+export type VitalsStrategy = "mobile" | "desktop";
+export type AlertKind =
+  | "traffic_drop"
+  | "site_down"
+  | "sync_failing"
+  | "indexing_issue";
+export type AlertSeverity = "info" | "warning" | "critical";
 
 export interface Database {
   public: {
@@ -329,6 +336,142 @@ export interface Database {
           },
         ];
       };
+      search_query_page_snapshot: {
+        Row: {
+          site_id: string;
+          query: string;
+          page: string;
+          clicks: number;
+          impressions: number;
+          average_position: number | null;
+          range_start: string;
+          range_end: string;
+          updated_at: string;
+        };
+        Insert: {
+          site_id: string;
+          query: string;
+          page: string;
+          clicks?: number;
+          impressions?: number;
+          average_position?: number | null;
+          range_start: string;
+          range_end: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["search_query_page_snapshot"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "search_query_page_snapshot_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      url_inspections: {
+        Row: {
+          site_id: string;
+          url: string;
+          verdict: string | null;
+          coverage_state: string | null;
+          indexing_state: string | null;
+          robots_txt_state: string | null;
+          last_crawl_time: string | null;
+          google_canonical: string | null;
+          inspected_at: string;
+          error: string | null;
+        };
+        Insert: {
+          site_id: string;
+          url: string;
+          verdict?: string | null;
+          coverage_state?: string | null;
+          indexing_state?: string | null;
+          robots_txt_state?: string | null;
+          last_crawl_time?: string | null;
+          google_canonical?: string | null;
+          inspected_at?: string;
+          error?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["url_inspections"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "url_inspections_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      web_vitals: {
+        Row: {
+          site_id: string;
+          measured_on: string;
+          strategy: VitalsStrategy;
+          performance_score: number | null;
+          lcp_ms: number | null;
+          inp_ms: number | null;
+          cls: number | null;
+          field_data: boolean;
+          field_category: string | null;
+        };
+        Insert: {
+          site_id: string;
+          measured_on: string;
+          strategy: VitalsStrategy;
+          performance_score?: number | null;
+          lcp_ms?: number | null;
+          inp_ms?: number | null;
+          cls?: number | null;
+          field_data?: boolean;
+          field_category?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["web_vitals"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "web_vitals_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      alerts: {
+        Row: {
+          id: string;
+          site_id: string | null;
+          kind: AlertKind;
+          severity: AlertSeverity;
+          title: string;
+          detail: string | null;
+          dedupe_key: string;
+          created_at: string;
+          emailed_at: string | null;
+          dismissed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          site_id?: string | null;
+          kind: AlertKind;
+          severity?: AlertSeverity;
+          title: string;
+          detail?: string | null;
+          dedupe_key: string;
+          created_at?: string;
+          emailed_at?: string | null;
+          dismissed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["alerts"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "alerts_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -369,3 +512,7 @@ export type SyncRun = Tables<"sync_runs">;
 export type IntegrationStatus = Tables<"integration_status">;
 export type TrackedQuery = Tables<"tracked_queries">;
 export type UptimeCheck = Tables<"uptime_checks">;
+export type SearchQueryPageSnapshot = Tables<"search_query_page_snapshot">;
+export type UrlInspection = Tables<"url_inspections">;
+export type WebVitals = Tables<"web_vitals">;
+export type Alert = Tables<"alerts">;

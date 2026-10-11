@@ -20,10 +20,8 @@ import { CoveragePanel } from "@/features/dashboard/CoveragePanel";
 import { RefreshQueue } from "@/features/dashboard/RefreshQueue";
 import { BriefingCard } from "@/features/dashboard/BriefingCard";
 import { PortfolioTrajectorySection } from "@/features/dashboard/PortfolioTrajectorySection";
-import { cn } from "@/lib/utils";
+import { RangeSelector } from "@/components/ui/range-selector";
 import { usePrivacyMode } from "@/lib/privacy";
-
-const RANGES = [7, 30, 90, 180, 360] as const;
 
 export function OverviewPage() {
   const privacy = usePrivacyMode();
@@ -230,33 +228,6 @@ function IntegrationCell({
             ? relativeTime(status.last_success_at)
             : "-"}
       </span>
-    </div>
-  );
-}
-
-function RangeSelector({
-  days,
-  onChange,
-}: {
-  days: number;
-  onChange: (days: number) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-border p-0.5">
-      {RANGES.map((r) => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          className={cn(
-            "rounded px-3 py-1 text-xs font-medium transition-colors",
-            days === r
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {r}d
-        </button>
-      ))}
     </div>
   );
 }

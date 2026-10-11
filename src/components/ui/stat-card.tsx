@@ -33,10 +33,12 @@ export function MetricDelta({
   change,
   goodWhenDown = false,
   compact = false,
+  vsLabel = "prev.",
 }: {
   change: number | null;
   goodWhenDown?: boolean;
   compact?: boolean;
+  vsLabel?: string;
 }) {
   const privacy = usePrivacyMode();
   const displayChange = privacy.enabled
@@ -50,7 +52,7 @@ export function MetricDelta({
   if (dir === "none") {
     return (
       <span className="text-muted-foreground">
-        {compact ? "-" : "- vs prev."}
+        {compact ? "-" : `- vs ${vsLabel}`}
       </span>
     );
   }
@@ -73,7 +75,7 @@ export function MetricDelta({
     >
       <Icon className="h-3 w-3" aria-hidden />
       {formatPercentChange(displayChange)}
-      {!compact && <span className="text-muted-foreground"> vs prev.</span>}
+      {!compact && <span className="text-muted-foreground"> vs {vsLabel}</span>}
     </span>
   );
 }
