@@ -3,6 +3,7 @@ import {
   ga4DateToIso,
   normalizeGa4Rows,
   normalizeGscRows,
+  normalizeQueryPageSnapshot,
   type Ga4Report,
 } from "../../supabase/functions/_shared/normalize";
 import {
@@ -19,6 +20,43 @@ describe("ga4DateToIso", () => {
   });
   it("throws on an unexpected format", () => {
     expect(() => ga4DateToIso("2026-06-21")).toThrow();
+  });
+});
+
+describe("normalizeQueryPageSnapshot", () => {
+  it("dedupes, rounds ints, nulls missing positions and sorts by clicks", () => {
+    const out = normalizeQueryPageSnapshot([
+      { keys: ["a", "/p1"], clicks: 1, impressions: 10, position: 3.2 },
+      { keys: ["a", "/p1"], clicks: 5, impressions: 20, position: 2 },
+      { keys: ["b", "/p2"], clicks: 9, impressions: 5 },
+      { keys: ["", "/p3"], clicks: 100 },
+      { keys: ["c"], clicks: 100 },
+    ]);
+    expect(out).toEqual([
+      {
+        query: "b",
+        page: "/p2",
+        clicks: 9,
+        impressions: 5,
+        average_position: null,
+      },
+      {
+        query: "a",
+        page: "/p1",
+        clicks: 5,
+        impressions: 20,
+        average_position: 2,
+      },
+    ]);
+  });
+
+  it("caps rows and tolerates undefined", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      keys: [`q${i}`, "/p"],
+      clicks: i,
+    }));
+    expect(normalizeQueryPageSnapshot(rows, 3)).toHaveLength(3);
+    expect(normalizeQueryPageSnapshot(undefined)).toEqual([]);
   });
 });
 

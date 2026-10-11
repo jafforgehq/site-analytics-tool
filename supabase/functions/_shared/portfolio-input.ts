@@ -14,6 +14,19 @@ export interface TrackedQueryInput {
   query: string;
 }
 
+export function parseAlertDismissInput(
+  body: unknown,
+): ParseResult<{ alertId: string }> {
+  if (typeof body !== "object" || body === null) {
+    return { ok: false, error: "Request body must be a JSON object" };
+  }
+  const { alertId } = body as Record<string, unknown>;
+  if (!isUuid(alertId)) {
+    return { ok: false, error: "alertId must be a valid UUID" };
+  }
+  return { ok: true, value: { alertId } };
+}
+
 export function parseTrackedQueryInput(
   body: unknown,
 ): ParseResult<TrackedQueryInput> {
