@@ -4,9 +4,10 @@ import { getGoogleAccessToken } from "./google-auth.ts";
 import {
   normalizeGscRows,
   normalizeGscBreakdown,
+  normalizeQueryPageSnapshot,
   type GscApiRow,
 } from "./normalize.ts";
-import { defaultRange } from "./range.ts";
+import { defaultRange, utcDateMinus } from "./range.ts";
 import type { SupabaseClient } from "./database.ts";
 import type { SyncAdapter } from "./sync-run.ts";
 
@@ -14,6 +15,8 @@ import type { SyncAdapter } from "./sync-run.ts";
 // overwrite earlier ones (brief §15).
 const DEFAULT_DAYS_BACK = 10;
 const BREAKDOWN_ROW_LIMIT = 5000;
+const SNAPSHOT_DAYS = 28;
+const SNAPSHOT_CHUNK = 1000;
 
 async function queryGsc(
   token: string,
@@ -131,6 +134,20 @@ export const gscAdapter: SyncAdapter = async ({
     failed.push("page");
   }
 
+  // --- Best-effort: query x page snapshot (cannibalization) ---
+  try {
+    const written = await replaceQueryPageSnapshot(
+      admin,
+      token,
+      property,
+      site.id,
+    );
+    rowsFetched += written.fetched;
+    rowsWritten += written.written;
+  } catch {
+    failed.push("query_page");
+  }
+
   return {
     rowsFetched,
     rowsWritten,
@@ -165,6 +182,51 @@ async function syncBreakdown(
     const { error } = await admin
       .from(table)
       .upsert(rows, { onConflict: `site_id,engine,metric_date,${keyColumn}` });
+    if (error) throw error;
+  }
+  return { fetched: apiRows.length, written: rows.length };
+}
+
+/**
+ * Aggregate (not per-date) query x page rows for the last 28 days. Replaces the
+ * site's previous snapshot, but only when the API returned data - an empty
+ * response must not wipe a good snapshot.
+ */
+async function replaceQueryPageSnapshot(
+  admin: SupabaseClient,
+  token: string,
+  property: string,
+  siteId: string,
+): Promise<{ fetched: number; written: number }> {
+  const rangeStart = utcDateMinus(SNAPSHOT_DAYS);
+  const rangeEnd = utcDateMinus(1);
+  const apiRows = await queryGsc(token, property, {
+    startDate: rangeStart,
+    endDate: rangeEnd,
+    dimensions: ["query", "page"],
+    rowLimit: BREAKDOWN_ROW_LIMIT,
+  });
+  const normalized = normalizeQueryPageSnapshot(apiRows, BREAKDOWN_ROW_LIMIT);
+  if (normalized.length === 0) return { fetched: apiRows.length, written: 0 };
+
+  const updatedAt = new Date().toISOString();
+  const rows = normalized.map((r) => ({
+    site_id: siteId,
+    ...r,
+    range_start: rangeStart,
+    range_end: rangeEnd,
+    updated_at: updatedAt,
+  }));
+
+  const { error: delError } = await admin
+    .from("search_query_page_snapshot")
+    .delete()
+    .eq("site_id", siteId);
+  if (delError) throw delError;
+  for (let i = 0; i < rows.length; i += SNAPSHOT_CHUNK) {
+    const { error } = await admin
+      .from("search_query_page_snapshot")
+      .insert(rows.slice(i, i + SNAPSHOT_CHUNK));
     if (error) throw error;
   }
   return { fetched: apiRows.length, written: rows.length };

@@ -5,13 +5,20 @@ import { useSite, useSiteMetrics, useSyncRuns } from "@/lib/hooks";
 import { computeHealth } from "@/lib/health";
 import {
   percentageChange,
-  splitPeriods,
   sumAnalytics,
   sumBy,
   weightedAveragePosition,
   weightedCtr,
   type AnalyticsMetricKey,
 } from "@/lib/metrics";
+import {
+  COMPARE_LABEL,
+  comparisonDate,
+  compareOffsetDays,
+  isCompareModeAvailable,
+  splitByOffset,
+  type CompareMode,
+} from "@/lib/compare";
 import { SOURCE_LABEL } from "@/lib/sources";
 import { formatCtr, formatNumber, formatPosition } from "@/lib/format";
 import { relativeTime, absoluteTime } from "@/lib/dates";
@@ -35,11 +42,14 @@ import { SiteReportExportButton } from "@/features/sites/SiteReportExportButton"
 import { TrajectorySection } from "@/features/sites/TrajectorySection";
 import { TrackedQueriesSection } from "@/features/sites/TrackedQueriesSection";
 import { UptimeCard } from "@/features/sites/UptimeCard";
+import { JourneyCard } from "@/features/sites/JourneyCard";
+import { VitalsCard } from "@/features/sites/VitalsCard";
+import { IndexingSection } from "@/features/sites/IndexingSection";
+import { OpportunitiesSection } from "@/features/sites/OpportunitiesSection";
+import { NewPagesSection } from "@/features/sites/NewPagesSection";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { CompareSelect, RangeSelector } from "@/components/ui/range-selector";
 import { usePrivacyMode } from "@/lib/privacy";
-
-const RANGES = [7, 30, 90, 180, 360] as const;
 
 const GA4_METRICS: { key: AnalyticsMetricKey; label: string }[] = [
   { key: "active_users", label: "Active users" },
@@ -48,6 +58,8 @@ const GA4_METRICS: { key: AnalyticsMetricKey; label: string }[] = [
   { key: "screen_page_views", label: "Page views" },
   { key: "engaged_sessions", label: "Engaged sessions" },
 ];
+
+const MIN_CHART_DAYS = 14;
 
 /** Merge Google + Bing daily rows into one date-keyed series for the charts. */
 function buildSearchChartData(
@@ -78,10 +90,16 @@ export function SiteDetailPage() {
   const { siteId = "" } = useParams();
   const navigate = useNavigate();
   const [days, setDays] = useState<number>(30);
+  const [compareChoice, setCompare] = useState<CompareMode>("previous");
+  // "Last week" only makes sense for windows of 7 days or fewer; fall back
+  // rather than carrying an invalid choice across a range change.
+  const compare = isCompareModeAvailable(compareChoice, days)
+    ? compareChoice
+    : "previous";
   const [editing, setEditing] = useState(false);
 
   const siteQuery = useSite(siteId);
-  const metricsQuery = useSiteMetrics(siteId, days);
+  const metricsQuery = useSiteMetrics(siteId, days, compare);
   const runsQuery = useSyncRuns({ siteId, limit: 10 });
 
   if (siteQuery.isLoading) return <DetailSkeleton />;
@@ -137,6 +155,7 @@ export function SiteDetailPage() {
             Edit
           </Button>
           <RangeSelector days={days} onChange={setDays} />
+          <CompareSelect mode={compare} days={days} onChange={setCompare} />
         </div>
       </div>
 
@@ -184,7 +203,11 @@ export function SiteDetailPage() {
         })}
       </div>
 
-      <UptimeCard siteId={site.id} />
+      <div className="grid gap-3 lg:grid-cols-3">
+        <UptimeCard siteId={site.id} />
+        <JourneyCard siteId={site.id} />
+        <VitalsCard siteId={site.id} />
+      </div>
 
       <ManualSyncButtons site={site} />
 
@@ -201,11 +224,18 @@ export function SiteDetailPage() {
           />
           <MetricsSection
             days={days}
+            compare={compare}
             analytics={metricsQuery.data?.analytics ?? []}
             search={metricsQuery.data?.search ?? []}
           />
         </>
       )}
+
+      <OpportunitiesSection siteId={siteId} />
+
+      <NewPagesSection siteId={siteId} />
+
+      <IndexingSection siteId={siteId} />
 
       <TrackedQueriesSection siteId={siteId} days={days} />
 
@@ -229,10 +259,12 @@ export function SiteDetailPage() {
 
 function MetricsSection({
   days,
+  compare,
   analytics,
   search,
 }: {
   days: number;
+  compare: CompareMode;
   analytics: AnalyticsDaily[];
   search: SearchDaily[];
 }) {
@@ -246,9 +278,22 @@ function MetricsSection({
     [search],
   );
 
-  const ga = splitPeriods(analytics, days);
-  const g = splitPeriods(google, days);
-  const b = splitPeriods(bing, days);
+  const offset = compareOffsetDays(compare, days);
+  const vsLabel = COMPARE_LABEL[compare].toLowerCase();
+  const ga = splitByOffset(analytics, days, offset);
+  const g = splitByOffset(google, days, offset);
+  const b = splitByOffset(bing, days, offset);
+  // A single day is a point, not a line - charts always span at least two weeks.
+  const chartDays = Math.max(days, MIN_CHART_DAYS);
+  const gaChart = splitByOffset(analytics, chartDays, offset);
+  const gChart = splitByOffset(google, chartDays, offset);
+  const bChart = splitByOffset(bing, chartDays, offset);
+  const compareName = days === 1 ? "comparison day" : "comparison period";
+
+  const prevAnalytics = new Map(
+    gaChart.previous.map((r) => [r.metric_date, r]),
+  );
+  const prevGoogle = new Map(gChart.previous.map((r) => [r.metric_date, r]));
 
   // Search aggregates
   const gClicks = sumBy(g.current, (r) => r.clicks);
@@ -265,16 +310,29 @@ function MetricsSection({
   const bImprPrev = sumBy(b.previous, (r) => r.impressions);
 
   // Chart data
-  const trafficData: ChartRow[] = ga.current.map((r) => ({
+  const prevSessions = (date: string) => {
+    const row = prevAnalytics.get(comparisonDate(date, offset));
+    return row
+      ? privacy.maskNumber(row.sessions, `chart:${date}:sessions-prev`)
+      : null;
+  };
+  const trafficData: ChartRow[] = gaChart.current.map((r) => ({
     date: r.metric_date,
     "Active users": privacy.maskNumber(
       r.active_users,
       `chart:${r.metric_date}:active-users`,
     ),
     Sessions: privacy.maskNumber(r.sessions, `chart:${r.metric_date}:sessions`),
+    "Sessions (prev)": prevSessions(r.metric_date),
   }));
 
-  const searchByDate = buildSearchChartData(g.current, b.current).map(
+  const prevGoogleClicks = (date: string) => {
+    const row = prevGoogle.get(comparisonDate(date, offset));
+    return row
+      ? privacy.maskNumber(row.clicks, `chart:${date}:google-clicks-prev`)
+      : null;
+  };
+  const searchByDate = buildSearchChartData(gChart.current, bChart.current).map(
     (row) => ({
       ...row,
       "Google clicks": privacy.maskNumber(
@@ -293,6 +351,7 @@ function MetricsSection({
         Number(row["Bing impressions"] ?? 0),
         `chart:${row.date}:bing-impressions`,
       ),
+      "Google clicks (prev)": prevGoogleClicks(row.date),
     }),
   );
 
@@ -301,7 +360,7 @@ function MetricsSection({
       {/* GA4 */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">
-          Google Analytics · last {days} days
+          Google Analytics · {days === 1 ? "latest day" : `last ${days} days`}
         </h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {GA4_METRICS.map(({ key, label }) => {
@@ -314,7 +373,12 @@ function MetricsSection({
                 value={formatNumber(
                   privacy.maskNumber(cur, `ga-card:${days}:${key}`),
                 )}
-                hint={<MetricDelta change={percentageChange(cur, prev)} />}
+                hint={
+                  <MetricDelta
+                    change={percentageChange(cur, prev)}
+                    vsLabel={vsLabel}
+                  />
+                }
               />
             );
           })}
@@ -338,6 +402,12 @@ function MetricsSection({
                   name: "Sessions",
                   color: CHART_COLORS.violet,
                 },
+                {
+                  key: "Sessions (prev)",
+                  name: `Sessions (${compareName})`,
+                  color: CHART_COLORS.slate,
+                  dashed: true,
+                },
               ]}
             />
           </CardContent>
@@ -346,7 +416,9 @@ function MetricsSection({
 
       {/* Search */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Search · last {days} days</h2>
+        <h2 className="text-sm font-semibold">
+          Search · {days === 1 ? "latest day" : `last ${days} days`}
+        </h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             label="Google clicks"
@@ -354,7 +426,10 @@ function MetricsSection({
               privacy.maskNumber(gClicks, `search:${days}:google-clicks`),
             )}
             hint={
-              <MetricDelta change={percentageChange(gClicks, gClicksPrev)} />
+              <MetricDelta
+                change={percentageChange(gClicks, gClicksPrev)}
+                vsLabel={vsLabel}
+              />
             }
           />
           <StatCard
@@ -362,7 +437,12 @@ function MetricsSection({
             value={formatNumber(
               privacy.maskNumber(gImpr, `search:${days}:google-impressions`),
             )}
-            hint={<MetricDelta change={percentageChange(gImpr, gImprPrev)} />}
+            hint={
+              <MetricDelta
+                change={percentageChange(gImpr, gImprPrev)}
+                vsLabel={vsLabel}
+              />
+            }
           />
           <StatCard
             label="Google CTR"
@@ -380,6 +460,7 @@ function MetricsSection({
                     ? percentageChange(gCtr, gCtrPrev)
                     : null
                 }
+                vsLabel={vsLabel}
               />
             }
           />
@@ -402,7 +483,10 @@ function MetricsSection({
               privacy.maskNumber(bClicks, `search:${days}:bing-clicks`),
             )}
             hint={
-              <MetricDelta change={percentageChange(bClicks, bClicksPrev)} />
+              <MetricDelta
+                change={percentageChange(bClicks, bClicksPrev)}
+                vsLabel={vsLabel}
+              />
             }
           />
           <StatCard
@@ -410,7 +494,12 @@ function MetricsSection({
             value={formatNumber(
               privacy.maskNumber(bImpr, `search:${days}:bing-impressions`),
             )}
-            hint={<MetricDelta change={percentageChange(bImpr, bImprPrev)} />}
+            hint={
+              <MetricDelta
+                change={percentageChange(bImpr, bImprPrev)}
+                vsLabel={vsLabel}
+              />
+            }
           />
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
@@ -431,6 +520,12 @@ function MetricsSection({
                     key: "Bing clicks",
                     name: "Bing",
                     color: CHART_COLORS.amber,
+                  },
+                  {
+                    key: "Google clicks (prev)",
+                    name: `Google (${compareName})`,
+                    color: CHART_COLORS.slate,
+                    dashed: true,
                   },
                 ]}
               />
@@ -504,33 +599,6 @@ function EngagementQuality({ rows }: { rows: AnalyticsDaily[] }) {
         label="Sessions / user"
         value={sessionsPerUser != null ? sessionsPerUser.toFixed(1) : "-"}
       />
-    </div>
-  );
-}
-
-function RangeSelector({
-  days,
-  onChange,
-}: {
-  days: number;
-  onChange: (days: number) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-border p-0.5">
-      {RANGES.map((r) => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          className={cn(
-            "rounded px-3 py-1 text-xs font-medium transition-colors",
-            days === r
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {r}d
-        </button>
-      ))}
     </div>
   );
 }

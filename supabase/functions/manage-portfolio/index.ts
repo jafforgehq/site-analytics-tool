@@ -9,6 +9,7 @@ import { requireAdminMfa } from "../_shared/auth.ts";
 import { normalizeError } from "../_shared/errors.ts";
 import {
   MAX_TRACKED_QUERIES_PER_SITE,
+  parseAlertDismissInput,
   parseTrackedQueryInput,
 } from "../_shared/portfolio-input.ts";
 
@@ -75,6 +76,18 @@ Deno.serve(async (req) => {
         .delete()
         .eq("site_id", parsed.value.siteId)
         .eq("query", parsed.value.query);
+      if (error) throw error;
+      return json(200, { ok: true }, cors);
+    }
+
+    // Alerts -----------------------------------------------------------------
+    if (action === "alert.dismiss") {
+      const parsed = parseAlertDismissInput(body);
+      if (!parsed.ok) return validationError(parsed.error, cors);
+      const { error } = await admin
+        .from("alerts")
+        .update({ dismissed_at: new Date().toISOString() })
+        .eq("id", parsed.value.alertId);
       if (error) throw error;
       return json(200, { ok: true }, cors);
     }

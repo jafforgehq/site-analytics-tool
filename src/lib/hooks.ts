@@ -4,6 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import type { CompareMode } from "@/lib/compare";
 import {
   addTrackedQuery,
   getAiBriefing,
@@ -15,6 +16,13 @@ import {
   removeTrackedQuery,
   getSite,
   getSiteMetrics,
+  getSiteQueryDaily,
+  getQueryPageSnapshot,
+  getUrlInspections,
+  getWebVitals,
+  getAlerts,
+  dismissAlert,
+  getPortfolioSessions,
   getSites,
   getSyncRuns,
   getInsights,
@@ -34,8 +42,8 @@ export const queryKeys = {
   insights: (days: number) => ["insights", days] as const,
   sites: ["sites"] as const,
   site: (siteId: string) => ["site", siteId] as const,
-  siteMetrics: (siteId: string, days: number) =>
-    ["site-metrics", siteId, days] as const,
+  siteMetrics: (siteId: string, days: number, compare: CompareMode) =>
+    ["site-metrics", siteId, days, compare] as const,
   siteSearchTerms: (siteId: string, days: number) =>
     ["site-search-terms", siteId, days] as const,
   integrationStatuses: (siteId?: string) =>
@@ -48,6 +56,14 @@ export const queryKeys = {
   sitePageDaily: (siteId: string, days: number) =>
     ["site-page-daily", siteId, days] as const,
   portfolioPageDaily: (days: number) => ["portfolio-page-daily", days] as const,
+  siteQueryDaily: (siteId: string, days: number) =>
+    ["site-query-daily", siteId, days] as const,
+  queryPageSnapshot: (siteId: string) =>
+    ["query-page-snapshot", siteId] as const,
+  urlInspections: (siteId: string) => ["url-inspections", siteId] as const,
+  webVitals: (siteId: string) => ["web-vitals", siteId] as const,
+  alerts: ["alerts"] as const,
+  portfolioSessions: (days: number) => ["portfolio-sessions", days] as const,
 };
 
 export function useSites() {
@@ -72,11 +88,18 @@ export function useSite(siteId: string) {
   });
 }
 
-export function useSiteMetrics(siteId: string, days: number) {
+export function useSiteMetrics(
+  siteId: string,
+  days: number,
+  compare: CompareMode = "previous",
+) {
   return useQuery({
-    queryKey: queryKeys.siteMetrics(siteId, days),
-    queryFn: () => getSiteMetrics(siteId, days),
+    queryKey: queryKeys.siteMetrics(siteId, days, compare),
+    queryFn: () => getSiteMetrics(siteId, days, compare),
     enabled: !!siteId,
+    // Switching range/compare mode keeps the old charts on screen while the
+    // new window loads, instead of flashing a skeleton.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -215,5 +238,64 @@ export function useAiBriefing() {
   return useMutation({
     mutationFn: (args: { days: number; summary: Record<string, unknown> }) =>
       getAiBriefing(args.days, args.summary),
+  });
+}
+
+// Growth tools ----------------------------------------------------------------
+
+export function useSiteQueryDaily(siteId: string, days: number) {
+  return useQuery({
+    queryKey: queryKeys.siteQueryDaily(siteId, days),
+    queryFn: () => getSiteQueryDaily(siteId, days),
+    enabled: !!siteId,
+  });
+}
+
+export function useQueryPageSnapshot(siteId: string) {
+  return useQuery({
+    queryKey: queryKeys.queryPageSnapshot(siteId),
+    queryFn: () => getQueryPageSnapshot(siteId),
+    enabled: !!siteId,
+  });
+}
+
+export function useUrlInspections(siteId: string) {
+  return useQuery({
+    queryKey: queryKeys.urlInspections(siteId),
+    queryFn: () => getUrlInspections(siteId),
+    enabled: !!siteId,
+  });
+}
+
+export function useWebVitals(siteId: string) {
+  return useQuery({
+    queryKey: queryKeys.webVitals(siteId),
+    queryFn: () => getWebVitals(siteId),
+    enabled: !!siteId,
+    // Vitals land weekly.
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useAlerts() {
+  return useQuery({
+    queryKey: queryKeys.alerts,
+    queryFn: () => getAlerts(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useDismissAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: dismissAlert,
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.alerts }),
+  });
+}
+
+export function usePortfolioSessions(days: number) {
+  return useQuery({
+    queryKey: queryKeys.portfolioSessions(days),
+    queryFn: () => getPortfolioSessions(days),
   });
 }

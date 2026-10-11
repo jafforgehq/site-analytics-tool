@@ -7,12 +7,15 @@ import {
   buildExportComputed,
   type PortfolioExportComputed,
 } from "@/lib/portfolio-export";
+import { historyDaysNeeded, type CompareMode } from "@/lib/compare";
 import type {
+  Alert,
   AnalyticsDaily,
   IntegrationStatus,
   SearchDaily,
   SearchPageDaily,
   SearchQueryDaily,
+  SearchQueryPageSnapshot,
   Site,
   SyncRun,
   SyncSource,
@@ -20,6 +23,8 @@ import type {
   TrackedQuery,
   TriggerType,
   UptimeCheck,
+  UrlInspection,
+  WebVitals,
 } from "@/types/database";
 
 // Centralized data access. UI components never call supabase directly - they
@@ -77,14 +82,18 @@ export interface SiteMetrics {
 }
 
 /**
- * Fetch enough history (2× the window) so the UI can compare the current period
- * against the immediately preceding one.
+ * Fetch enough history for the window plus its comparison period (the
+ * preceding window, same days last week, or the same days last year).
  */
 export async function getSiteMetrics(
   siteId: string,
   days: number,
+  compare: CompareMode = "previous",
 ): Promise<SiteMetrics> {
-  const since = format(subDays(new Date(), days * 2), "yyyy-MM-dd");
+  const since = format(
+    subDays(new Date(), historyDaysNeeded(compare, Math.max(days, 14))),
+    "yyyy-MM-dd",
+  );
   const [analytics, search] = await Promise.all([
     fetchAllPages<AnalyticsDaily>(() =>
       supabase
@@ -849,4 +858,96 @@ export async function getAiBriefing(
     briefing: result.briefing,
     model: result.model ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Growth tools: opportunities, indexing, vitals, alerts
+// ---------------------------------------------------------------------------
+
+/** Per-day query rows for the opportunity finders (every stored query). */
+export async function getSiteQueryDaily(
+  siteId: string,
+  days: number,
+): Promise<SearchQueryDaily[]> {
+  const since = format(subDays(new Date(), days), "yyyy-MM-dd");
+  return fetchAllPages<SearchQueryDaily>(() =>
+    supabase
+      .from("search_query_daily")
+      .select("*")
+      .eq("site_id", siteId)
+      .eq("engine", "google")
+      .gte("metric_date", since)
+      .order("metric_date"),
+  );
+}
+
+export async function getQueryPageSnapshot(
+  siteId: string,
+): Promise<SearchQueryPageSnapshot[]> {
+  return fetchAllPages<SearchQueryPageSnapshot>(() =>
+    supabase
+      .from("search_query_page_snapshot")
+      .select("*")
+      .eq("site_id", siteId)
+      .order("impressions", { ascending: false }),
+  );
+}
+
+export async function getUrlInspections(
+  siteId: string,
+): Promise<UrlInspection[]> {
+  return fetchAllPages<UrlInspection>(() =>
+    supabase
+      .from("url_inspections")
+      .select("*")
+      .eq("site_id", siteId)
+      .order("url"),
+  );
+}
+
+/** Last 12 weeks of PageSpeed / Core Web Vitals measurements for a site. */
+export async function getWebVitals(siteId: string): Promise<WebVitals[]> {
+  const since = format(subDays(new Date(), 84), "yyyy-MM-dd");
+  const { data, error } = await supabase
+    .from("web_vitals")
+    .select("*")
+    .eq("site_id", siteId)
+    .gte("measured_on", since)
+    .order("measured_on");
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Open (not dismissed) alerts, newest first. */
+export async function getAlerts(limit = 50): Promise<Alert[]> {
+  const { data, error } = await supabase
+    .from("alerts")
+    .select("*")
+    .is("dismissed_at", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function dismissAlert(alertId: string): Promise<void> {
+  await invokeFunction(
+    "manage-portfolio",
+    { action: "alert.dismiss", alertId },
+    "Could not dismiss the alert.",
+  );
+}
+
+/** Daily Google sessions history for every site - the Journey tracker input. */
+export async function getPortfolioSessions(
+  days: number,
+): Promise<AnalyticsDaily[]> {
+  const since = format(subDays(new Date(), days), "yyyy-MM-dd");
+  return fetchAllPages<AnalyticsDaily>(() =>
+    supabase
+      .from("analytics_daily")
+      .select("*")
+      .gte("metric_date", since)
+      .order("metric_date"),
+  );
 }

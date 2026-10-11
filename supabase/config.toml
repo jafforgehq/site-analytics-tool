@@ -99,5 +99,14 @@ verify_jwt = false
 [functions.ai-briefing]
 verify_jwt = false
 
+[functions.scheduled-indexing]
+verify_jwt = false
+
+[functions.scheduled-vitals]
+verify_jwt = false
+
+[functions.scheduled-alerts]
+verify_jwt = false
+
 [analytics]
 enabled = false
