@@ -359,7 +359,9 @@ export interface Database {
           range_end: string;
           updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["search_query_page_snapshot"]["Insert"]>;
+        Update: Partial<
+          Database["public"]["Tables"]["search_query_page_snapshot"]["Insert"]
+        >;
         Relationships: [
           {
             foreignKeyName: "search_query_page_snapshot_site_id_fkey";
@@ -394,7 +396,9 @@ export interface Database {
           inspected_at?: string;
           error?: string | null;
         };
-        Update: Partial<Database["public"]["Tables"]["url_inspections"]["Insert"]>;
+        Update: Partial<
+          Database["public"]["Tables"]["url_inspections"]["Insert"]
+        >;
         Relationships: [
           {
             foreignKeyName: "url_inspections_site_id_fkey";

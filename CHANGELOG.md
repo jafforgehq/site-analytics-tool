@@ -6,6 +6,17 @@ This project doesn't yet cut formal GitHub Releases or git tags - version number
 
 ## [Unreleased]
 
+### Added
+
+- Date comparison: a single-day range and a 14-day range join 7/30/90/180/360, and every range can be compared against the previous period, the same days last week, or the same days last year. The comparison period is overlaid as a dashed line on the traffic and clicks charts. Comparison windows are now chosen by calendar date rather than row count, so a missed sync day no longer shifts them.
+- Opportunity finders on each site: striking-distance queries (positions 8-20), weak-snippet queries (CTR well below the norm for their position), and query cannibalization (new `search_query_page_snapshot` table, refreshed by the Search Console sync).
+- New-page tracker showing days to first click for pages that appeared after tracking began.
+- Indexing status from the Search Console URL Inspection API, checking up to 40 sitemap URLs per site per day (`scheduled-indexing`, `url_inspections`).
+- Weekly Core Web Vitals / PageSpeed check with a per-site card (`scheduled-vitals`, `web_vitals`).
+- Alerts for traffic drops, site downtime, repeatedly failing syncs, and indexing problems, shown on the overview with optional Resend email digests (`scheduled-alerts`, `alerts`).
+- Mediavine Journey tracker (1,000 sessions per rolling 30 days) on the overview and each site, with a projected eligibility date from the traffic forecast. It counts all GA4 sessions; the dashboard does not yet separate "premium" sessions by country.
+- Migration `0011_growth_tools.sql`. Apply it, then deploy the three new Edge Functions.
+
 ## [0.6.0] - 2026-08-30
 
 ### Added

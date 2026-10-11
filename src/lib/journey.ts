@@ -1,6 +1,7 @@
 // Mediavine Journey eligibility tracker: rolling-30-day sessions against the
 // program minimum, with a projected crossing date from the traffic forecast.
 
+import { format, parseISO } from "date-fns";
 import { forecastSeries, type SeriesPoint } from "@/lib/forecast";
 
 /** Mediavine Journey: 1,000 sessions per rolling month. */
@@ -89,4 +90,19 @@ export function computeJourneyProgress(
     }
   }
   return { ...base, status: "unlikely", projectedDate: null };
+}
+
+export function journeyStatusLabel(progress: JourneyProgress): string {
+  switch (progress.status) {
+    case "reached":
+      return "Eligible now";
+    case "projected":
+      return progress.projectedDate
+        ? `On pace for ${format(parseISO(progress.projectedDate), "d MMM yyyy")}`
+        : "On pace";
+    case "unlikely":
+      return "Not on pace within 6 months";
+    default:
+      return "No data";
+  }
 }

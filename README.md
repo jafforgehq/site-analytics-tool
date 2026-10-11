@@ -26,6 +26,11 @@ It gives a solo publisher or small portfolio operator one private place to see t
 - CSV/ZIP and PDF exports, plus a privacy mode for screensharing.
 - One-click full-portfolio export (JSON) for feeding into an AI agent: every table plus derived insights and forecasts in one file.
 - Light, dark, and system theme with a per-device preference.
+- Flexible comparison: a single-day view plus 7/14/30/90/180/360-day ranges, each comparable against the previous period, the same days last week, or the same days last year, with the earlier period overlaid on the charts.
+- Opportunity finders from Search Console data: queries stuck at positions 8-20, page-one queries with a weak CTR for their position, and queries where several of your own pages compete.
+- New-page tracker: how many days each newly published page took to earn its first click.
+- Indexing status per sitemap URL (Search Console URL Inspection API), weekly Core Web Vitals / PageSpeed, and daily alerts for traffic drops, downtime, failing syncs, and indexing problems.
+- Mediavine Journey tracker: rolling 30-day sessions against the 1,000-session minimum, with a projected eligibility date per site.
 - Traffic trajectory forecasting (Holt-Winters with weekly seasonality, computed locally) with confidence bands on charts, for every metric and the whole portfolio combined.
 - Content refresh queue: pages whose Google clicks decayed ≥25% versus their own prior 28 days, ranked by lost volume.
 - Lightweight query rank tracking: star Search Console queries and chart their average position over time - no scraping, no extra API calls.
@@ -160,9 +165,9 @@ Create a new Supabase project in the dashboard. In **Project Settings → API**,
 
 Then apply the database migrations. They create the tables, RLS policies, Edge Functions' database permissions, scheduled cron jobs, and retention jobs.
 
-Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0010`), paste its contents into a new query, and run it - one file at a time, in order.
+Open the **SQL Editor**, then open each file in [`supabase/migrations/`](supabase/migrations) on GitHub in filename order (`0001` → `0011`), paste its contents into a new query, and run it - one file at a time, in order.
 
-Afterwards, open **Integrations → Cron → Jobs**: five jobs (three daily syncs, an hourly uptime check, and a weekly cleanup) should be listed. Scheduled syncs will report configuration errors until the secrets in the next steps exist; they do not affect an unrelated project.
+Afterwards, open **Integrations → Cron → Jobs**: nine jobs (three daily syncs, an hourly uptime check, a daily indexing check, a weekly Core Web Vitals check, a daily alert check, and two weekly cleanups) should be listed. Scheduled syncs will report configuration errors until the secrets in the next steps exist; they do not affect an unrelated project.
 
 ### 2. Configure Google Cloud and mint a refresh token
 
@@ -204,6 +209,17 @@ AUTOMATION_SECRET=YOUR_LONG_RANDOM_VALUE
 ALLOWED_APP_ORIGIN=https://monitor.example.com
 ```
 
+**Optional secrets** for the growth tools (none are required; the features work without them):
+
+```
+PSI_API_KEY=YOUR_GOOGLE_API_KEY          # PageSpeed Insights quota; the weekly vitals check works keyless but may be rate-limited
+RESEND_API_KEY=YOUR_RESEND_API_KEY       # with ALERT_EMAIL_TO, emails new alerts as a daily digest
+ALERT_EMAIL_TO=you@example.com           # comma-separated for several recipients
+ALERT_EMAIL_FROM=Site Analytics <alerts@your-domain.com>
+```
+
+Alerts always appear on the dashboard overview; email is an add-on. The indexing check uses the same Google refresh token as the Search Console sync, so no new scope is needed.
+
 **Vault values** (what the scheduled cron jobs read at run time) - go to **Integrations → Vault → Secrets** and choose **Add new secret** twice:
 
 - Name `project_url`, value `https://YOUR_PROJECT_REF.supabase.co`
@@ -211,7 +227,7 @@ ALLOWED_APP_ORIGIN=https://monitor.example.com
 
 ### 5. Deploy the Edge Functions - the one terminal step
 
-This is the **only** part that isn't point-and-click. The eight functions - `manage-sites`, `manage-portfolio`, `manual-sync`, `scheduled-sync-gsc`, `scheduled-sync-ga4`, `scheduled-sync-bing`, `scheduled-uptime`, `ai-briefing` - share helpers in [`supabase/functions/_shared/`](supabase/functions/_shared) (imported as `../_shared/...`), and the dashboard's in-browser editor deploys one function in isolation, so it can't resolve those shared imports. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) bundles the shared code automatically, so run this once from a clone of the repo:
+This is the **only** part that isn't point-and-click. The eleven functions - `manage-sites`, `manage-portfolio`, `manual-sync`, `scheduled-sync-gsc`, `scheduled-sync-ga4`, `scheduled-sync-bing`, `scheduled-uptime`, `scheduled-indexing`, `scheduled-vitals`, `scheduled-alerts`, `ai-briefing` - share helpers in [`supabase/functions/_shared/`](supabase/functions/_shared) (imported as `../_shared/...`), and the dashboard's in-browser editor deploys one function in isolation, so it can't resolve those shared imports. The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) bundles the shared code automatically, so run this once from a clone of the repo:
 
 ```bash
 supabase login
@@ -223,10 +239,13 @@ supabase functions deploy scheduled-sync-gsc
 supabase functions deploy scheduled-sync-ga4
 supabase functions deploy scheduled-sync-bing
 supabase functions deploy scheduled-uptime
+supabase functions deploy scheduled-indexing
+supabase functions deploy scheduled-vitals
+supabase functions deploy scheduled-alerts
 supabase functions deploy ai-briefing
 ```
 
-Then confirm all eight appear under **Edge Functions** in the dashboard. After this one step, everything else is back in the browser.
+Then confirm all eleven appear under **Edge Functions** in the dashboard. After this one step, everything else is back in the browser.
 
 ### 6. Lock down Supabase Auth and create your admin
 

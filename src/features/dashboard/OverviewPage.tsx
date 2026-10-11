@@ -17,6 +17,8 @@ import { InsightsFeed } from "@/features/dashboard/InsightsFeed";
 import { TopMovers } from "@/features/dashboard/TopMovers";
 import { ComparisonTable } from "@/features/dashboard/ComparisonTable";
 import { CoveragePanel } from "@/features/dashboard/CoveragePanel";
+import { AlertsPanel } from "@/features/dashboard/AlertsPanel";
+import { JourneyPanel } from "@/features/dashboard/JourneyPanel";
 import { RefreshQueue } from "@/features/dashboard/RefreshQueue";
 import { BriefingCard } from "@/features/dashboard/BriefingCard";
 import { PortfolioTrajectorySection } from "@/features/dashboard/PortfolioTrajectorySection";
@@ -89,7 +91,11 @@ export function OverviewPage() {
             </div>
           )}
 
+          <AlertsPanel />
+
           <PortfolioKpis data={insights.data} />
+
+          <JourneyPanel />
 
           <PortfolioTrajectorySection
             analytics={insights.data.raw.analytics.filter((r) =>

@@ -933,7 +933,7 @@ export async function getAlerts(limit = 50): Promise<Alert[]> {
 export async function dismissAlert(alertId: string): Promise<void> {
   await invokeFunction(
     "manage-portfolio",
-    { action: "alert.dismiss", alert: { alertId } },
+    { action: "alert.dismiss", alertId },
     "Could not dismiss the alert.",
   );
 }
