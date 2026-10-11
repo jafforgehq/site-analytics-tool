@@ -3,6 +3,7 @@ import {
   combineAnalyticsAcrossSites,
   combineSearchAcrossSites,
   computeTrajectories,
+  premiumSessionsSeries,
 } from "@/lib/series";
 import type { AnalyticsDaily, SearchDaily } from "@/types/database";
 
@@ -19,6 +20,7 @@ function analyticsRow(
     sessions: 0,
     screen_page_views: 0,
     engaged_sessions: 0,
+    premium_sessions: null,
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
   };
@@ -163,5 +165,19 @@ describe("computeTrajectories", () => {
   it("returns null forecasts for every metric on empty input", () => {
     const results = computeTrajectories([], [], 14);
     expect(results.every((r) => r.forecast === null)).toBe(true);
+  });
+});
+
+describe("premiumSessionsSeries", () => {
+  it("skips days that have not been synced (null) but keeps real zeros", () => {
+    const rows = [
+      analyticsRow("s", "2026-08-01", { premium_sessions: null }),
+      analyticsRow("s", "2026-08-02", { premium_sessions: 0 }),
+      analyticsRow("s", "2026-08-03", { premium_sessions: 9 }),
+    ];
+    expect(premiumSessionsSeries(rows)).toEqual([
+      { date: "2026-08-02", value: 0 },
+      { date: "2026-08-03", value: 9 },
+    ]);
   });
 });

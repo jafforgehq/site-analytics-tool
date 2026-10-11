@@ -14,7 +14,7 @@ This project doesn't yet cut formal GitHub Releases or git tags - version number
 - Indexing status from the Search Console URL Inspection API, checking up to 40 sitemap URLs per site per day (`scheduled-indexing`, `url_inspections`).
 - Weekly Core Web Vitals / PageSpeed check with a per-site card (`scheduled-vitals`, `web_vitals`).
 - Alerts for traffic drops, site downtime, repeatedly failing syncs, and indexing problems, shown on the overview with optional Resend email digests (`scheduled-alerts`, `alerts`).
-- Mediavine Journey tracker (1,000 sessions per rolling 30 days) on the overview and each site, with a projected eligibility date from the traffic forecast. It counts all GA4 sessions; the dashboard does not yet separate "premium" sessions by country.
+- Mediavine Journey tracker (1,000 premium sessions per rolling 30 days) on the overview and each site, with a projected eligibility date from the traffic forecast. Premium means US, UK, Canada and Australia traffic; the GA4 sync stores that country-filtered count in `analytics_daily.premium_sessions` (migration `0012`) and backfills 60 days on its first run. New Zealand is excluded until Mediavine lists it.
 - Migration `0011_growth_tools.sql`. Apply it, then deploy the three new Edge Functions.
 
 ## [0.6.0] - 2026-08-30

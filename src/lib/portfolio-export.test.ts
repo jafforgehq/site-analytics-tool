@@ -38,6 +38,7 @@ function analyticsRow(
     sessions,
     screen_page_views: sessions * 2,
     engaged_sessions: Math.round(sessions * 0.6),
+    premium_sessions: null,
     updated_at: NOW.toISOString(),
   };
 }

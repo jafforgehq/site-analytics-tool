@@ -3,6 +3,8 @@ import {
   ga4DateToIso,
   normalizeGa4Rows,
   normalizeGscRows,
+  normalizePremiumSessions,
+  PREMIUM_COUNTRIES,
   normalizeQueryPageSnapshot,
   type Ga4Report,
 } from "../../supabase/functions/_shared/normalize";
@@ -181,5 +183,60 @@ describe("date range helpers", () => {
       startDate: "2026-06-14",
       endDate: "2026-06-20",
     });
+  });
+});
+
+describe("normalizePremiumSessions", () => {
+  const report: Ga4Report = {
+    metricHeaders: [{ name: "sessions" }],
+    rows: [
+      {
+        dimensionValues: [{ value: "20260619" }],
+        metricValues: [{ value: "7" }],
+      },
+      {
+        dimensionValues: [{ value: "20260621" }],
+        metricValues: [{ value: "12" }],
+      },
+    ],
+  };
+
+  it("fills days GA4 omitted with real zeros across the whole range", () => {
+    const rows = normalizePremiumSessions(
+      report,
+      SITE,
+      "2026-06-19",
+      "2026-06-21",
+      UPDATED,
+    );
+    expect(rows.map((r) => [r.metric_date, r.premium_sessions])).toEqual([
+      ["2026-06-19", 7],
+      ["2026-06-20", 0],
+      ["2026-06-21", 12],
+    ]);
+    expect(rows.every((r) => r.site_id === SITE)).toBe(true);
+  });
+
+  it("throws if the sessions header is missing", () => {
+    expect(() =>
+      normalizePremiumSessions(
+        { metricHeaders: [{ name: "users" }], rows: [] },
+        SITE,
+        "2026-06-19",
+        "2026-06-19",
+        UPDATED,
+      ),
+    ).toThrow();
+  });
+});
+
+describe("PREMIUM_COUNTRIES", () => {
+  it("matches the markets Mediavine names", () => {
+    expect([...PREMIUM_COUNTRIES]).toEqual([
+      "United States",
+      "United Kingdom",
+      "Canada",
+      "Australia",
+    ]);
   });
 });

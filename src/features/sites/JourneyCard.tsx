@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Rocket } from "lucide-react";
 import { useSiteMetrics } from "@/lib/hooks";
-import { analyticsSeries } from "@/lib/series";
+import { premiumSessionsSeries } from "@/lib/series";
 import { computeJourneyProgress } from "@/lib/journey";
 import { formatNumber } from "@/lib/format";
 import { usePrivacyMode } from "@/lib/privacy";
@@ -17,7 +17,7 @@ export function JourneyCard({ siteId }: { siteId: string }) {
   const progress = useMemo(
     () =>
       computeJourneyProgress(
-        analyticsSeries(metrics.data?.analytics ?? [], "sessions"),
+        premiumSessionsSeries(metrics.data?.analytics ?? []),
       ),
     [metrics.data],
   );
@@ -32,13 +32,13 @@ export function JourneyCard({ siteId }: { siteId: string }) {
       <CardContent className="space-y-2 p-4">
         <span className="inline-flex items-center gap-1.5 text-sm font-medium">
           <Rocket className="h-4 w-4" aria-hidden />
-          Mediavine Journey · 30 days
+          Mediavine Journey · premium sessions, 30 days
         </span>
         <p className="text-2xl font-semibold tabular-nums">
           {formatNumber(current)}
           <span className="text-sm font-normal text-muted-foreground">
             {" "}
-            / {formatNumber(progress.target)} sessions
+            / {formatNumber(progress.target)} premium sessions
           </span>
         </p>
         <JourneyBar progress={privacy.enabled ? 0.5 : progress.progress} />

@@ -65,6 +65,8 @@ export interface Database {
           sessions: number;
           screen_page_views: number;
           engaged_sessions: number;
+          /** US/UK/CA/AU sessions; null until the GA4 sync has filled the day. */
+          premium_sessions: number | null;
           updated_at: string;
         };
         Insert: {
@@ -75,6 +77,7 @@ export interface Database {
           sessions?: number;
           screen_page_views?: number;
           engaged_sessions?: number;
+          premium_sessions?: number | null;
           updated_at?: string;
         };
         Update: Partial<
